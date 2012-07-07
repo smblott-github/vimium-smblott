@@ -129,14 +129,14 @@ initializePreDomReady = ->
 
   chrome.extension.onConnect.addListener (port, name) ->
     if (port.name == "executePageCommand")
-      port.onMessage.addListener (args) ->
-        if (frameId == args.frameId)
-          if (args.passCountToFunction)
-            Utils.invokeCommandString(args.command, [args.count])
+      port.onMessage.addListener (commandInfo) ->
+        if (frameId == commandInfo.frameId)
+          if (commandInfo.passCountToFunction)
+            Utils.invokeCommandString(commandInfo.command, [commandInfo.count, commandInfo.kwargs])
           else
-            Utils.invokeCommandString(args.command) for i in [0...args.count]
+            Utils.invokeCommandString(commandInfo.command, [commandInfo.kwargs]) for i in [0...commandInfo.count]
 
-        refreshCompletionKeys(args)
+        refreshCompletionKeys(commandInfo)
     else if (port.name == "getScrollPosition")
       port.onMessage.addListener (args) ->
         scrollPort = chrome.extension.connect({ name: "returnScrollPosition" })

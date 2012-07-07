@@ -40,11 +40,13 @@ LinkHints =
        "@contenteditable='' or translate(@contenteditable, 'TRUE', 'true')='true']"])
 
   # We need this as a top-level function because our command system doesn't yet support arguments.
-  activateModeToOpenInNewTab: -> @activateMode(true, false, false)
-  activateModeToCopyLinkUrl: -> @activateMode(null, false, true)
-  activateModeWithQueue: -> @activateMode(true, true, false)
+  activateModeToOpenInNewTab: -> @activateMode(openInNewTab: true)
+  activateModeToCopyLinkUrl: -> @activateMode(copyLinkUrl: true)
+  activateModeWithQueue: -> @activateMode(openInNewTab: true, withQueue: true)
 
-  activateMode: (openInNewTab, withQueue, copyLinkUrl) ->
+  activateMode: (kwargs) ->
+    kwargs ?= {}
+    {openInNewTab, withQueue, copyLinkUrl} = kwargs
     if (!document.getElementById("vimiumLinkHintCss"))
       # linkHintCss is declared by vimiumFrontend.js and contains the user supplied css overrides.
       addCssToPage(linkHintCss, "vimiumLinkHintCss")

@@ -620,7 +620,9 @@
 
       if (!registryEntry.isBackgroundCommand) {
         var port = chrome.tabs.connect(tabId, { name: "executePageCommand" });
-        port.postMessage({ command: registryEntry.command,
+        console.log(registryEntry);
+        port.postMessage({ command: registryEntry.fn,
+                           kwargs: registryEntry.kwargs,
                            frameId: frameId,
                            count: count,
                            passCountToFunction: registryEntry.passCountToFunction,
@@ -630,9 +632,11 @@
         refreshedCompletionKeys = true;
       } else {
         if(registryEntry.passCountToFunction){
-          this[registryEntry.command](count);
+          // TODO pass args
+          this[registryEntry.fn](count);
         } else {
-          repeatFunction(this[registryEntry.command], count, 0, frameId);
+          // TODO pass args
+          repeatFunction(this[registryEntry.fn], count, 0, frameId);
         }
       }
 

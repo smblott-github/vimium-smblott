@@ -23,14 +23,19 @@ Commands =
       passCountToFunction: options.passCountToFunction
 
   mapKeyToCommand: (key, command) ->
-    unless @availableCommands[command]
-      console.log(command, "doesn't exist!")
+    [commandFn, commandKwargsStr] = command.split /\s+/
+    # we could use JSON.parse, but `eval` allows for unquoted keys
+    commandKwargs = if commandKwargsStr? then JSON.parse commandKwargs else []
+
+    unless @availableCommands[commandFn]
+      console.log(commandFn, "doesn't exist!")
       return
 
     @keyToCommandRegistry[key] =
-      command: command
-      isBackgroundCommand: @availableCommands[command].isBackgroundCommand
-      passCountToFunction: @availableCommands[command].passCountToFunction
+      fn: commandFn
+      kwargs: commandKwargs
+      isBackgroundCommand: @availableCommands[commandFn].isBackgroundCommand
+      passCountToFunction: @availableCommands[commandFn].passCountToFunction
 
   unmapKey: (key) -> delete @keyToCommandRegistry[key]
 
@@ -59,9 +64,7 @@ Commands =
       if (lineCommand == "map")
         continue if (splitLine.length != 3)
         key = @normalizeKey(splitLine[1])
-        vimiumCommand = splitLine[2]
-
-        continue unless @availableCommands[vimiumCommand]
+        vimiumCommand = splitLine[2..]
 
         console.log("Mapping", key, "to", vimiumCommand)
         @mapKeyToCommand(key, vimiumCommand)
@@ -90,7 +93,7 @@ Commands =
        "reload", "toggleViewSource", "copyCurrentUrl", "LinkHints.activateModeToCopyLinkUrl",
        "openCopiedUrlInCurrentTab", "openCopiedUrlInNewTab", "goUp",
        "enterInsertMode", "focusInput",
-       "LinkHints.activateMode", "LinkHints.activateModeToOpenInNewTab", "LinkHints.activateModeWithQueue",
+       "LinkHints.activateMode", 'LinkHints.activateMode {"openInNewTab":true}', "LinkHints.activateModeWithQueue",
        "Vomnibar.activate", "Vomnibar.activateWithCurrentUrl", "Vomnibar.activateTabSelection",
        "Vomnibar.activateBookmarks",
        "goPrevious", "goNext", "nextFrame"]
@@ -137,7 +140,7 @@ defaultKeyMappings =
   "gi": "focusInput"
 
   "f":     "LinkHints.activateMode"
-  "F":     "LinkHints.activateModeToOpenInNewTab"
+  'F':     'LinkHints.activateMode {"openInNewTab":true}'
   "<a-f>": "LinkHints.activateModeWithQueue"
 
   "/": "enterFindMode"
@@ -205,7 +208,7 @@ commandDescriptions =
   focusInput: ["Focus the first (or n-th) text box on the page", { passCountToFunction: true }]
 
   'LinkHints.activateMode': ["Open a link in the current tab"]
-  'LinkHints.activateModeToOpenInNewTab': ["Open a link in a new tab"]
+  'LinkHints.activateMode {"openInNewTab": true}': ["Open a link in a new tab"]
   'LinkHints.activateModeWithQueue': ["Open multiple links in a new tab"]
 
   enterFindMode: ["Enter find mode"]
