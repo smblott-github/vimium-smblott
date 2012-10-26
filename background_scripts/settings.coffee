@@ -4,19 +4,66 @@
 
 root = exports ? window
 root.Settings = Settings =
-  get: (key) ->
-    if (key of localStorage) then JSON.parse(localStorage[key]) else @defaults[key]
+# get: (key) ->
+#   if (key of localStorage) then JSON.parse(localStorage[key]) else @defaults[key]
 
-  set: (key, value) ->
-    # don't store the value if it is equal to the default, so we can change the defaults in the future
-    if (value == @defaults[key])
-      @clear(key)
+# set: (key, value) ->
+#   # don't store the value if it is equal to the default, so we can change the defaults in the future
+#   if (value == @defaults[key])
+#     @clear(key)
+#   else
+#     localStorage[key] = JSON.stringify(value)
+
+# clear: (key) -> delete localStorage[key]
+
+# has: (key) -> key of localStorage
+
+  storage:
+    chrome.storage.sync
+
+  storage_error: (msg) ->
+    if chrome.runtime.lastError
+      console.log "chrome.storage.sync error: #{msg} #{chrome.storage.sync.message}"
+      false
     else
-      localStorage[key] = JSON.stringify(value)
+      true
+  
+  get: (key, callback) ->
+    @storage.get key,
+      (items) ->
+        if Settings.storage_error "get #{key}" # yikes! what do we do here?
+          callback Settings.defaults[key]
+          return
 
-  clear: (key) -> delete localStorage[key]
+        callback ( if key of items                      # 1st choice, a value from synced storage
+                     items[key]
+                   else
+                     if key of localStorage             # 2nd choice, a legacy value from localStorage
+                       v = JSON.parse localStorage[key]
+                       # propagate legacy setting to synced storage
+                       Settings.set key, v,
+                         (k,v) ->
+                           if k of localStorage
+                             delete localStorage[k]
+                       v
+                     else
+                       Settings.defaults[key] )         # 3rd choice, a default value
 
-  has: (key) -> key of localStorage
+  # set key to value, or clear key if value is equal to default (thereby allowing defaults to change in future)
+  # call callback, if provided, but only if no error arises
+  set: (key, value, callback) ->
+    if value == @defaults[key]
+      @storage.clear key,
+        ->
+          Settings.storage_error "clear #{key}"
+          callback key, @defaults[key] if callback and not chrome.runtime.lastError
+    else
+      item = {}
+      item[key] = value
+      @storage.set item,
+        ->
+          Settings.storage_error "set #{key}"
+          callback key, value if callback and not chrome.runtime.lastError
 
   defaults:
     scrollStepSize: 60
