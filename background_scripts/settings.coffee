@@ -10,7 +10,7 @@ root.Settings = Settings =
     chrome.storage.sync
 
   storageOperationOK: (msg) ->
-    console.log "chrome.storage.sync error: #{msg} #{chrome.storage.sync.message}" if chrome.runtime.lastError
+    console.log "chrome.storage error: #{msg} #{chrome.runtime.lastError.message}" if chrome.runtime.lastError
     not chrome.runtime.lastError
   
   get: (key, callback) ->
