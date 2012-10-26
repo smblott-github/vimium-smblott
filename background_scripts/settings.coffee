@@ -16,7 +16,7 @@ root.Settings = Settings =
   get: (key, callback) ->
     @storage.get key,
       (items) ->
-        if Settings.storageOperationOK "get #{key}"
+        if not Settings.storageOperationOK "get #{key}"
           # yikes! what do we do now?
           callback Settings.defaults[key]
           return
