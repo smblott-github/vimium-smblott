@@ -1,69 +1,89 @@
 #
-# Used by everyone to manipulate localStorage.
+# Used by everyone to manipulate chrome.storage
+# Legacy settings from localStorage are propagated into chrome.storage as the are encountered
 #
 
 root = exports ? window
 root.Settings = Settings =
-# get: (key) ->
-#   if (key of localStorage) then JSON.parse(localStorage[key]) else @defaults[key]
 
-# set: (key, value) ->
-#   # don't store the value if it is equal to the default, so we can change the defaults in the future
-#   if (value == @defaults[key])
-#     @clear(key)
-#   else
-#     localStorage[key] = JSON.stringify(value)
-
-# clear: (key) -> delete localStorage[key]
-
-# has: (key) -> key of localStorage
-
-  storage:
-    chrome.storage.sync
-
-  storage_error: (msg) ->
-    if chrome.runtime.lastError
-      console.log "chrome.storage.sync error: #{msg} #{chrome.storage.sync.message}"
-      false
-    else
-      true
-  
   get: (key, callback) ->
-    @storage.get key,
-      (items) ->
-        if Settings.storage_error "get #{key}" # yikes! what do we do here?
-          callback Settings.defaults[key]
-          return
+    if callback
+      @storage.get key,
+        (items) ->
+          if not Settings.storageOperationOK "get #{key}"
+            # yikes! what do we do now?
+            callback Settings.defaults[key]
+            return
 
-        callback ( if key of items                      # 1st choice, a value from synced storage
-                     items[key]
-                   else
-                     if key of localStorage             # 2nd choice, a legacy value from localStorage
-                       v = JSON.parse localStorage[key]
-                       # propagate legacy setting to synced storage
-                       Settings.set key, v,
-                         (k,v) ->
-                           if k of localStorage
-                             delete localStorage[k]
-                       v
-                     else
-                       Settings.defaults[key] )         # 3rd choice, a default value
+          callback(
+            # where might we get a value from?
+            #   1st choice, the value passed from chrome.storage
+            #   2nd choice, a legacy value from localStorage
+            #   3rd choice, the default value
+            if items and key of items
+              # have value from chrome.storage
+              if key of localStorage
+                # also have legacy value in localStorage; choose the value
+                # from chrome.storage and delete the key/value in localStorage
+                delete localStorage[key] 
+              items[key]
+            else
+              if key of localStorage
+                value = JSON.parse localStorage[key]
+                # propagate legacy setting to chrome storage and delete it
+                Settings.set key, value,
+                  (k,v) ->
+                    if k isnt key
+                      # should not happen
+                      console.log "Settings.set: mismatched keys: #{key} #{k}"
+                    # actual delete only happens after successful callback from Settings.set (so we don't lose the setting)
+                    if key of localStorage
+                      delete localStorage[key] 
+                # yield legacy value
+                value
+              else
+                Settings.defaults[key] )
 
-  # set key to value, or clear key if value is equal to default (thereby allowing defaults to change in future)
-  # call callback, if provided, but only if no error arises
+  # set key to value, or clear key if value is equal to the default (thereby allowing defaults to be changed in future)
+  # call callback(key,value) -- optional -- but only there are no errors
   set: (key, value, callback) ->
+    # BUG: the following is ALWAYS false for keys with numeric default values (such as scrollStepSize)
     if value == @defaults[key]
-      @storage.clear key,
-        ->
-          Settings.storage_error "clear #{key}"
-          callback key, @defaults[key] if callback and not chrome.runtime.lastError
+      @clear key, callback
     else
       item = {}
       item[key] = value
       @storage.set item,
         ->
-          Settings.storage_error "set #{key}"
-          callback key, value if callback and not chrome.runtime.lastError
+          if Settings.storageOperationOK "set #{key}" and callback
+            callback key, value
+
+  clear: (key, callback) ->
+    @storage.clear key,
+      ->
+        if Settings.storageOperationOK "clear #{key}" and callback
+          callback key, Settings.defaults[key]
+
+  # @has() doesn't make much sense with this asynchronous interface
+  # here, @has calls callback with a boolean (if the caller wanted the value, they would have used get!)
+  has: (key, callback) ->
+    if callback
+      @get key,
+        (value) ->
+          callback( value != Settings.defaults[key] )
+  
+  # ############################################################
+  # utilities/configuration
+
+  storage:
+    chrome.storage.sync
+
+  storageOperationOK: (msg) ->
+    console.log "chrome.storage error: #{msg} #{chrome.runtime.lastError.message}" if chrome.runtime.lastError
+    not chrome.runtime.lastError
+  
+  # ############################################################
+  # default values
 
   defaults:
     scrollStepSize: 60

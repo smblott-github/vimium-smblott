@@ -22,6 +22,7 @@
     "bookmarks",
     "history",
     "clipboardRead",
+    "storage",
     "<all_urls>"
   ],
   "content_scripts": [
