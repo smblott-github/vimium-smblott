@@ -1,50 +1,48 @@
 #
 # Used by everyone to manipulate chrome.storage
-# Legacy settings from localStorage are propagated into chrome.storage
+# Legacy settings from localStorage are propagated into chrome.storage as the are encountered
 #
 
 root = exports ? window
 root.Settings = Settings =
 
-  storage:
-    chrome.storage.sync
-
-  storageOperationOK: (msg) ->
-    console.log "chrome.storage error: #{msg} #{chrome.runtime.lastError.message}" if chrome.runtime.lastError
-    not chrome.runtime.lastError
-  
   get: (key, callback) ->
-    @storage.get key,
-      (items) ->
-        if not Settings.storageOperationOK "get #{key}"
-          # yikes! what do we do now?
-          callback Settings.defaults[key]
-          return
+    if callback
+      @storage.get key,
+        (items) ->
+          if not Settings.storageOperationOK "get #{key}"
+            # yikes! what do we do now?
+            callback Settings.defaults[key]
+            return
 
-        # where might we get a value from?
-        #   1st choice, the value passed from @storage
-        #   2nd choice, a legacy value from localStorage
-        #   3rd choice, the default value
-        callback(
-          if items and key of items
-            # we have a value from chrome.storage
-            if key of localStorage
-              # we also have a legacy value in localStorage, choose the value
-              # from chrome.storage and delete the key/value in localStorage
-              delete localStorage[k] 
-            items[key]
-          else
-            if key of localStorage
-              value = JSON.parse localStorage[key]
-              # propagate legacy setting to chrome storage and delete it
-              Settings.set key, value,
-                (k,v) ->
-                  if k of localStorage
-                    delete localStorage[k] 
-              # yield legacy value
-              value
+          callback(
+            # where might we get a value from?
+            #   1st choice, the value passed from chrome.storage
+            #   2nd choice, a legacy value from localStorage
+            #   3rd choice, the default value
+            if items and key of items
+              # have value from chrome.storage
+              if key of localStorage
+                # also have legacy value in localStorage; choose the value
+                # from chrome.storage and delete the key/value in localStorage
+                delete localStorage[key] 
+              items[key]
             else
-              Settings.defaults[key] ) if callback
+              if key of localStorage
+                value = JSON.parse localStorage[key]
+                # propagate legacy setting to chrome storage and delete it
+                Settings.set key, value,
+                  (k,v) ->
+                    if k isnt key
+                      # should not happen
+                      console.log "Settings.set: mismatched keys: #{key} #{k}"
+                    # actual delete only happens after successful callback from Settings.set (so we don't lose the setting)
+                    if key of localStorage
+                      delete localStorage[key] 
+                # yield legacy value
+                value
+              else
+                Settings.defaults[key] )
 
   # set key to value, or clear key if value is equal to the default (thereby allowing defaults to be changed in future)
   # call callback(key,value) -- optional -- but only there are no errors
@@ -74,6 +72,19 @@ root.Settings = Settings =
         (value) ->
           callback( value != Settings.defaults[key] )
   
+  # ############################################################
+  # utilities/configuration
+
+  storage:
+    chrome.storage.sync
+
+  storageOperationOK: (msg) ->
+    console.log "chrome.storage error: #{msg} #{chrome.runtime.lastError.message}" if chrome.runtime.lastError
+    not chrome.runtime.lastError
+  
+  # ############################################################
+  # default values
+
   defaults:
     scrollStepSize: 60
     linkHintCharacters: "sadfjklewcmpgh"
