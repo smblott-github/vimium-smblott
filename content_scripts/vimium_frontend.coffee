@@ -18,6 +18,7 @@ isEnabledForUrl = true
 # The user's operating system.
 currentCompletionKeys = null
 validFirstKeys = null
+passkeys = null
 
 # The types in <input type="..."> that we consider for focusInput command. Right now this is recalculated in
 # each content script. Alternatively we could calculate it once in the background page and use a request to
@@ -138,6 +139,7 @@ initializeWhenEnabled = ->
   document.addEventListener("blur", onBlurCapturePhase, true)
   document.addEventListener("DOMActivate", onDOMActivate, true)
   enterInsertModeIfElementIsFocused()
+  passkeys = response.passkeys
 
 #
 # Used to disable Vimium without needing to reload the page.
