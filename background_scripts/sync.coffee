@@ -132,3 +132,36 @@ root.Sync = Sync =
 
 Sync.init()
 
+# ##### Note 1 - Default Values
+#
+# What happens if different versions of vimium with DIFFERENT DEFAULT VALUES
+# are installed on chrome instances attached to the same account?
+#
+# When an option is reset to the default on one system, it is also reset to the
+# default on the other.  But that's a different default!  Moreover, it's next
+# to impossible for a user to figure out what's going on.
+#
+# The source of the problem is the "optimization" whereby settings are only
+# stored for non-default values.
+#
+# ##### Note 2 - Maximum Key/Value Size in chrome.storage
+#
+# The chrome.storage API allows:
+#
+#   - QUOTA_BYTES_PER_ITEM ( 4,096 )
+#
+# If this is exceeded, calls to chrome.storage.sync.set() fail immediately.
+# The effect (as currently implemented) will be:
+#
+#   - the new setting will be stored in localStorage
+#   - the call to chrome.storage.sync.set() will fail
+#   - the new setting will remain in effect until vimium is restarted, at which
+#     point ...
+#   - vimium will revert to the old setting value
+# 
+# This is not nice!
+#
+# In practice, that means you're limited to about 180 key mappings and about
+# 130 excluded URLs (based on a quick look at my own settings).  Not
+# disasterous, but not great.
+#
