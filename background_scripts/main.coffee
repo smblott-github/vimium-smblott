@@ -79,7 +79,7 @@ isEnabledForUrl = (request) ->
     # The user can add "*" to the URL which means ".*"
     regexp = new RegExp("^" + url.replace(/\*/g, ".*") + "$")
     if request.url.match(regexp)
-      # exclusion or passkeys is decided on the first pattern matching the request.url
+      # exclusion or passkeys is decided on the first pattern matching request.url
       if passkeys
         # if passkeys are defined, then vimium is enabled, but the indicated keys are passed through to the undelying page
         console.log "isEnabledForUrl: true #{passkeys} #{request.url}"
