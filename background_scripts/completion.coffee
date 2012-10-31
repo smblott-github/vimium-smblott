@@ -266,7 +266,7 @@ RankingUtils =
       titleScore = titleScore * RankingUtils.normalizeDifference(queryLength, title.length)
     else
       titleScore = urlScore
-    (urlScore + 3*titleScore) / 4
+    (urlScore + titleScore) / 2
 
   # Returns a score between [0, 1] which indicates how recent the given timestamp is. Items which are over
   # a month old are counted as 0. This range is quadratic, so an item from one day ago has a much stronger
