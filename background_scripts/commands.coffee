@@ -93,7 +93,7 @@ Commands =
        "LinkHints.activateMode", "LinkHints.activateModeToOpenInNewTab", "LinkHints.activateModeWithQueue",
        "Vomnibar.activate", "Vomnibar.activateInNewTab", "Vomnibar.activateTabSelection",
        "Vomnibar.activateBookmarks", "Vomnibar.activateBookmarksInNewTab",
-       "goPrevious", "goNext", "nextFrame"]
+       "goPrevious", "goNext", "nextFrame", "Marks.activateCreateMode", "Marks.activateGotoMode"]
     findCommands: ["enterFindMode", "performFind", "performBackwardsFind"]
     historyNavigation:
       ["goBack", "goForward"]
@@ -108,7 +108,7 @@ Commands =
   advancedCommands: [
     "scrollToLeft", "scrollToRight",
     "goUp", "goInc", "goDec", "focusInput", "LinkHints.activateModeWithQueue",
-    "goPrevious", "goNext"]
+    "goPrevious", "goNext", "Marks.activateCreateMode", "Marks.activateGotoMode"]
 
 defaultKeyMappings =
   "?": "showHelp"
@@ -175,6 +175,9 @@ defaultKeyMappings =
   "B": "Vomnibar.activateBookmarksInNewTab"
 
   "gf": "nextFrame"
+
+  "m": "Marks.activateCreateMode"
+  "`": "Marks.activateGotoMode"
 
 
 # This is a mapping of: commandIdentifier => [description, options].
@@ -243,6 +246,9 @@ commandDescriptions =
   "Vomnibar.activateBookmarksInNewTab": ["Open a bookmark in a new tab"]
 
   nextFrame: ["Cycle forward to the next frame on the page", { background: true, passCountToFunction: true }]
+
+  "Marks.activateCreateMode": ["Create a new mark"]
+  "Marks.activateGotoMode": ["Go to a mark"]
 
 Commands.init()
 
