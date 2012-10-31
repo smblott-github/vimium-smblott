@@ -110,6 +110,7 @@ class BookmarkCompleter
     @traverseBookmarksRecursive(bookmarks.reverse())
 
   # Recursive helper for traverseBookmarks
+  # Expects its arguments to have been reversed.
   traverseBookmarksRecursive: (bookmarks) ->
     results = []
     toVisit = bookmarks
