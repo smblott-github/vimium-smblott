@@ -323,9 +323,8 @@ extend window,
     # page to copy.
     # http://code.google.com/p/chromium/issues/detail?id=55188
     chrome.extension.sendRequest { handler: "getCurrentTabUrl" }, (url) ->
+      HUD.showForDuration("Yanked URL: #{url}", 3000)
       chrome.extension.sendRequest { handler: "copyToClipboard", data: url }
-
-    HUD.showForDuration("Yanked URL", 1000)
 
   focusInput: (count) ->
     # Focus the first input element on the page, and create overlays to highlight all the input elements, with
