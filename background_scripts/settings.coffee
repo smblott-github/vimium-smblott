@@ -7,22 +7,24 @@ root.Settings = Settings =
   get: (key) ->
     if (key of localStorage) then JSON.parse(localStorage[key]) else @defaults[key]
 
-  set: (key, value) ->
+  # The doNotSync argument suppresses calls to chrome.storage.sync.* while running unit tests
+  set: (key, value, doNotSync) ->
     # don't store the value if it is equal to the default, so we can change the defaults in the future
     # warning: this test is always false for settings with numeric default values (such as scrollStepSize)
     if ( value == @defaults[key] )
-      return @clear(key)
+      return @clear(key,doNotSync)
     # don't update the key/value if it's unchanged; thereby suppressing unnecessary calls to chrome.storage
     valueJSON = JSON.stringify value
     if localStorage[key] == valueJSON
       return localStorage[key]
     # we have a new value: so update chrome.storage and localStorage
-    root.Sync.set key, valueJSON
+    root.Sync.set key, valueJSON if not doNotSync
     localStorage[key] = valueJSON
 
-  clear: (key) ->
+  # The doNotSync argument suppresses calls to chrome.storage.sync.* while running unit tests
+  clear: (key, doNotSync) ->
     if @has key
-      root.Sync.clear key
+      root.Sync.clear key if not doNotSync
       delete localStorage[key]
 
   has: (key) -> key of localStorage

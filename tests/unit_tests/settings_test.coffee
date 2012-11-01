@@ -5,14 +5,6 @@ Utils.getCurrentVersion = -> '1.42'
 global.localStorage = {}
 {Settings} = require "../../background_scripts/settings.js"
 
-# This fails because `chrome.storage.sync` isn't defined.
-# Not sure how `chrome.*` APIs should be incorporated into unit tests.
-console.log "************************************************"
-console.log "This will fail ..."
-console.log "See note in `tests/unit_tests/settings_test.coffee`."
-console.log "************************************************"
-{Sync} = require "../../background_scripts/sync.js"
-
 context "settings",
   
   setup ->
@@ -23,16 +15,16 @@ context "settings",
     assert.equal Settings.get('scrollStepSize'), 60
 
   should "store values", ->
-    Settings.set 'scrollStepSize', 20
+    Settings.set 'scrollStepSize', 20, true
     assert.equal Settings.get('scrollStepSize'), 20
 
   should "not store values equal to the default", ->
-    Settings.set 'scrollStepSize', 20
+    Settings.set 'scrollStepSize', 20, true
     assert.isTrue Settings.has 'scrollStepSize'
-    Settings.set 'scrollStepSize', 60
+    Settings.set 'scrollStepSize', 60, true
     assert.isFalse Settings.has 'scrollStepSize'
 
   should "revert to defaults if no key is stored", ->
-    Settings.set 'scrollStepSize', 20
-    Settings.clear 'scrollStepSize'
+    Settings.set 'scrollStepSize', 20, true
+    Settings.clear 'scrollStepSize', true
     assert.equal Settings.get('scrollStepSize'), 60
