@@ -326,8 +326,7 @@ extend window,
 #
 
 isPasskey = ( keyChar ) ->
-  retVal = passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0
-  consoloe.log "isPasskey: #{keyChar} #{retVal}"
+  consoloe.log "isPasskey: #{keyChar} #{passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0}"
   passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0
 
 #
