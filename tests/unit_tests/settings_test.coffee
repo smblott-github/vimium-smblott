@@ -5,6 +5,14 @@ Utils.getCurrentVersion = -> '1.42'
 global.localStorage = {}
 {Settings} = require "../../background_scripts/settings.js"
 
+# This fails because `chrome.storage.sync` isn't defined.
+# Not sure how `chrome.*` APIs should be incorporated into unit tests.
+console.log "************************************************"
+console.log "This will fail ..."
+console.log "See note in `tests/unit_tests/settings_test.coffee`."
+console.log "************************************************"
+{Sync} = require "../../background_scripts/sync.js"
+
 context "settings",
   
   setup ->
