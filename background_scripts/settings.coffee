@@ -18,13 +18,13 @@ root.Settings = Settings =
     if localStorage[key] == valueJSON
       return localStorage[key]
     # we have a new value: so update chrome.storage and localStorage
-    root.Sync.set key, valueJSON if not doNotSync
+    root.Sync.set key, valueJSON if root?.Sync?.set
     localStorage[key] = valueJSON
 
   # The doNotSync argument suppresses calls to chrome.storage.sync.* while running unit tests
   clear: (key, doNotSync) ->
     if @has key
-      root.Sync.clear key if not doNotSync
+      root.Sync.clear key if root?.Sync?.clear
       delete localStorage[key]
 
   has: (key) -> key of localStorage
