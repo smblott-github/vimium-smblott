@@ -131,7 +131,7 @@ initializePreDomReady = ->
 #
 # This is called once the background page has told us that Vimium should be enabled for the current URL.
 #
-initializeWhenEnabled = ->
+initializeWhenEnabled = (response) ->
   document.addEventListener("keydown", onKeydown, true)
   document.addEventListener("keypress", onKeypress, true)
   document.addEventListener("keyup", onKeyup, true)
@@ -139,6 +139,7 @@ initializeWhenEnabled = ->
   document.addEventListener("blur", onBlurCapturePhase, true)
   document.addEventListener("DOMActivate", onDOMActivate, true)
   enterInsertModeIfElementIsFocused()
+  console.log "setting passkeys: #{response.passkeys}"
   passkeys = response.passkeys
 
 #
@@ -481,7 +482,7 @@ checkIfEnabledForUrl = ->
   chrome.extension.sendRequest { handler: "isEnabledForUrl", url: url }, (response) ->
     isEnabledForUrl = response.isEnabledForUrl
     if (isEnabledForUrl)
-      initializeWhenEnabled()
+      initializeWhenEnabled(response)
     else if (HUD.isReady())
       # Quickly hide any HUD we might already be showing, e.g. if we entered insert mode on page load.
       HUD.hide()
