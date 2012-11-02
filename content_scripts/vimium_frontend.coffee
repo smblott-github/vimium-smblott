@@ -347,7 +347,7 @@ extend window,
 #
 
 isPasskey = ( keyChar ) ->
-  consoloe.log "isPasskey: #{keyChar} #{passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0}"
+  console.log "isPasskey: #{keyChar} #{passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0}"
   passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0
 
 #
