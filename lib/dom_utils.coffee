@@ -1,20 +1,5 @@
 DomUtils =
   #
-  # Adds the given CSS to the page.
-  #
-  addCssToPage: (css, id) ->
-    return if document.getElementById(id)
-    head = document.getElementsByTagName("head")[0]
-    if (!head)
-      head = document.createElement("head")
-      document.documentElement.appendChild(head)
-    style = document.createElement("style")
-    style.id = id
-    style.type = "text/css"
-    style.appendChild(document.createTextNode(css))
-    head.appendChild(style)
-
-  #
   # Runs :callback if the DOM has loaded, otherwise runs it on load
   #
   documentReady: do ->
@@ -74,7 +59,8 @@ DomUtils =
       # eliminate invisible elements (see test_harnesses/visibility_test.html)
       computedStyle = window.getComputedStyle(element, null)
       if (computedStyle.getPropertyValue('visibility') != 'visible' ||
-          computedStyle.getPropertyValue('display') == 'none')
+          computedStyle.getPropertyValue('display') == 'none' ||
+          computedStyle.getPropertyValue('opacity') == '0')
         continue
 
       return clientRect
