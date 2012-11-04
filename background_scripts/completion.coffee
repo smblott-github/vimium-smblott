@@ -112,11 +112,11 @@ class BookmarkCompleter
   # Traverses the bookmark hierarchy, and retuns a flattened list of all bookmarks in the tree.
   traverseBookmarks: (bookmarks) ->
     results = []
-    toVisit = bookmarks
+    toVisit = bookmarks.reverse()
     while toVisit.length > 0
-      bookmark = toVisit.shift()
+      bookmark = toVisit.pop()
       results.push(bookmark)
-      toVisit.push.apply(toVisit, bookmark.children) if (bookmark.children)
+      toVisit.push.apply(toVisit, bookmark.children.reverse()) if (bookmark.children)
     results
 
   computeRelevancy: (suggestion) ->
@@ -257,7 +257,7 @@ RankingUtils =
       regexp = RegexpCache.get(term)
       matchedTerm = false
       for thing in things
-        matchedTerm = matchedTerm || (thing?.match && thing.match regexp)
+        matchedTerm ||= thing.match regexp
       return false unless matchedTerm
     true
 
@@ -268,8 +268,8 @@ RankingUtils =
     titleScore = 0.0
     for term in queryTerms
       queryLength += term.length
-      urlScore += 1 if RankingUtils.matches [term], url
-      titleScore += 1 if RankingUtils.matches [term], title
+      urlScore += 1 if url && RankingUtils.matches [term], url
+      titleScore += 1 if title && RankingUtils.matches [term], title
     urlScore = urlScore / queryTerms.length
     urlScore = urlScore * RankingUtils.normalizeDifference(queryLength, url.length)
     if title
