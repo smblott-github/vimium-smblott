@@ -268,23 +268,87 @@ RankingUtils =
       return false unless matchedTerm
     true
 
-  # Returns a number between [0, 1] indicating how often the query terms appear in the url and title.
+  # Count the number of disjoint matches of `term` in `string`.
+  countMatches: (term, string, justPassTheseThrough...) ->
+    string.split(RegexpCache.get term, justPassTheseThrough...).length - 1
+
+  # Count the number of characters from `string` matching `term`.
+  countMatchedCharacters: (term, string, justPassTheseThrough...) ->
+    term.length * @countMatches term, string, justPassTheseThrough...
+    
+  # Relative significance of matches in URLs and titles.
+  # A match in a URL is just two thirds as relevant as a match in a title.
+  # Weights must be in the range [0,1].
+  # TODO: These are fudge factors, they require tuning.
+  urlTitleWeights:
+    {
+      url:   0.6666,   # weight applied to matches in URL
+      title: 1.0       # weight applied to matches in title
+    }
+
+  # Triples for relevancy tests, each being:
+  #   - a prefix
+  #   - a suffix
+  #   - a relative weight (must be in the range [0,1])
+  #
+  # TODO: Weights are fudge factors, they need tuning.
+  # TODO: Are there any other cases to consider?
+  # TODO: Are there better patterns for matching URLs?
+  wordRelevancyCases:
+    [ 
+      # prefix    suffix    weight
+      [ "",       "",       0.5    ], # match the term anywhere in the string
+      [ "\\b",    "",       0.75   ], # match the term at the start of a word
+      [ "\\b",    "\\b",    1.0    ]  # only match whole words
+    ]
+
+  # The wordRelevancy() approach here is adapted from:
+  #   - http://www.stonetemple.com/a-mathematical-model-for-assessing-page-quality/
+  #   - What is described there as "a relative weight of each section of the
+  #     page", is here relative weights for the URL and the title; see `@urlTitleWeights`.
+  #   - While he describes counting words, here it's characters which are counted.
+  #     Two reasons:
+  #       - Here, we're also interested in partial matches.
+  #       - It is not clear what a "word" within a URL might be.
+  #   - Basically, we sum up the number of characters in the title and url
+  #     which match the search terms (weighting as we go), then weight again
+  #     and normalise.
+  #
   wordRelevancy: (queryTerms, url, title) ->
-    queryLength = 0
-    urlScore = 0.0
-    titleScore = 0.0
+    # TODO: Consider caching scores.
+    #
+    # Throughout, we have:
+    #   assert: cummulativeUrlScore <= totalAvailableUrlScore
+    #   assert: cummulativeTitleScore <= totalAvailableTitleScore
+    #
+    cummulativeUrlScore = 0
+    cummulativeTitleScore = 0
+    totalAvailableUrlScore = url.length * queryTerms.length * @wordRelevancyCases.length
+    totalAvailableTitleScore = 0
+    totalAvailableTitleScore = title.length * queryTerms.length * @wordRelevancyCases.length if title
     for term in queryTerms
-      queryLength += term.length
-      urlScore += 1 if url && RankingUtils.matches [term], url
-      titleScore += 1 if title && RankingUtils.matches [term], title
-    urlScore = urlScore / queryTerms.length
-    urlScore = urlScore * RankingUtils.normalizeDifference(queryLength, url.length)
-    if title
-      titleScore = titleScore / queryTerms.length
-      titleScore = titleScore * RankingUtils.normalizeDifference(queryLength, title.length)
-    else
-      titleScore = urlScore
-    (urlScore + titleScore) / 2
+      for [ prefix, suffix, weight ] in @wordRelevancyCases
+        urlScore = @countMatchedCharacters term, url, prefix, suffix
+        titleScore = @countMatchedCharacters term, title, prefix, suffix if title
+        # Weight the scores.
+        urlScore *= weight
+        titleScore *= weight if title
+        # Accumulate the scores.
+        cummulativeUrlScore += urlScore
+        cummulativeTitleScore += titleScore if title
+
+    # If no title was provided, then just copy the URL score.
+    if not title
+      cummulativeTitleScore = cummulativeUrlScore
+      totalAvailableTitleScore = totalAvailableUrlScore
+    
+    # Weight scores again, this time by @urlTitleWeights.
+    cummulativeUrlScore *= @urlTitleWeights.url
+    cummulativeTitleScore *= @urlTitleWeights.title
+
+    # Normalise, and we're done ...
+    (cummulativeUrlScore + cummulativeTitleScore) / (totalAvailableUrlScore + totalAvailableTitleScore)
+
 
   # Returns a score between [0, 1] which indicates how recent the given timestamp is. Items which are over
   # a month old are counted as 0. This range is quadratic, so an item from one day ago has a much stronger
