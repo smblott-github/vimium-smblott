@@ -251,6 +251,17 @@ context "RankingUtils.wordRelevancy",
     console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
     assert.isTrue highScore > lowScore
 
+  # TODO: remove this test.
+  should "working test case", ->
+    lowScore  = RankingUtils.wordRelevancy(["sd"], "joel.rosdahl.net/maildirproc/examples/simple.rc", null)
+    highScore = RankingUtils.wordRelevancy(["sd"], "http://slashdot.org", "Slashdot (SD)")
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+    console.log highScore
+    console.log Math.sqrt highScore
+    console.log Math.sqrt Math.sqrt highScore
+    console.log Math.sqrt Math.sqrt Math.sqrt highScore
+
 context "RegexpCache",
   should "RegexpCache is in fact caching (positive case)", ->
     assert.isTrue RegexpCache.get("this") is RegexpCache.get("this")

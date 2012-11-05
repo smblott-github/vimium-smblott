@@ -161,7 +161,7 @@ class HistoryCompleter
     recencyScore = RankingUtils.recencyScore(historyEntry.lastVisitTime)
     wordRelevancy = RankingUtils.wordRelevancy(suggestion.queryTerms, suggestion.url, suggestion.title)
     # Average out the word score and the recency. Recency has the ability to pull the score up, but not down.
-    score = (wordRelevancy + Math.max(recencyScore, wordRelevancy)) / 2
+    RankingUtils.calibrateRelevanceScores wordRelevancy, recencyScore
 
   refresh: ->
 
@@ -191,7 +191,7 @@ class DomainCompleter
     for domain in domainCandidates
       recencyScore = RankingUtils.recencyScore(@domains[domain].lastVisitTime || 0)
       wordRelevancy = RankingUtils.wordRelevancy(queryTerms, domain, null)
-      score = wordRelevancy + Math.max(recencyScore, wordRelevancy) / 2
+      score = RankingUtils.calibrateRelevanceScores wordRelevancy, recencyScore
       results.push([domain, score])
     results.sort (a, b) -> b[1] - a[1]
     results
@@ -337,7 +337,7 @@ RankingUtils =
     cummulativeUrlScore = 0
     cummulativeTitleScore = 0
     totalAvailableUrlScore = url.length * queryTerms.length * @wordRelevancyCases.length
-    totalAvailableTitleScore = 0
+    totalAvailableTitleScore = totalAvailableUrlScore
     totalAvailableTitleScore = title.length * queryTerms.length * @wordRelevancyCases.length if title
     for term in queryTerms
       for [ prefix, suffix, weight ] in @wordRelevancyCases
@@ -362,7 +362,6 @@ RankingUtils =
     # Normalise, and we're done ...
     (cummulativeUrlScore + cummulativeTitleScore) / (totalAvailableUrlScore + totalAvailableTitleScore)
 
-
   # Returns a score between [0, 1] which indicates how recent the given timestamp is. Items which are over
   # a month old are counted as 0. This range is quadratic, so an item from one day ago has a much stronger
   # score than an item from two days ago.
@@ -379,6 +378,20 @@ RankingUtils =
   normalizeDifference: (a, b) ->
     max = Math.max(a, b)
     (max - Math.abs(a - b)) / max
+
+  # Given scores for wordRelevancy and recency, combine them into a single overall score.
+  # TODO: There's much fudging below, it needs tuning.
+  calibrateRelevanceScores: (wordRelevancy, recencyScore) ->
+    # Boost wordRelevancy.
+    calibratedWordRelevancy = Math.sqrt Math.sqrt wordRelevancy
+    # Unboost recencyScore.
+    calibratedRecencyScore = recencyScore * recencyScore * recencyScore
+    # Don't totally ignore something just because it hasn't been asccessed in a while.
+    # In other words, a poor recencyScore cannot totally undermine relevance.
+    calibratedRecencyScore = Math.max(calibratedWordRelevancy, calibratedRecencyScore)
+    # And average them.
+    (calibratedWordRelevancy + calibratedRecencyScore) / 2
+
 
 # We cache regexps because we use them frequently when comparing a query to history entries and bookmarks,
 # and we don't want to create fresh objects for every comparison.
