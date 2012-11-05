@@ -13,7 +13,7 @@
 # It also has an attached "computeRelevancyFunction" which determines how well this item matches the given
 # query terms.
 class Suggestion
-  showRelevancy: false # Set this to true to render relevancy when debugging the ranking scores.
+  showRelevancy: true # Set this to true to render relevancy when debugging the ranking scores.
 
   # - type: one of [bookmark, history, tab].
   # - computeRelevancyFunction: a function which takes a Suggestion and returns a relevancy score
@@ -350,15 +350,15 @@ RankingUtils =
         cummulativeUrlScore += urlScore
         cummulativeTitleScore += titleScore if title
 
+    # Weight scores again, this time by @urlTitleWeights.
+    cummulativeUrlScore *= @urlTitleWeights.url
+    cummulativeTitleScore *= @urlTitleWeights.title
+
     # If no title was provided, then just copy the URL score.
     if not title
       cummulativeTitleScore = cummulativeUrlScore
       totalAvailableTitleScore = totalAvailableUrlScore
     
-    # Weight scores again, this time by @urlTitleWeights.
-    cummulativeUrlScore *= @urlTitleWeights.url
-    cummulativeTitleScore *= @urlTitleWeights.title
-
     # Normalise, and we're done ...
     (cummulativeUrlScore + cummulativeTitleScore) / (totalAvailableUrlScore + totalAvailableTitleScore)
 

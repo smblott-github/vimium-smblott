@@ -193,6 +193,8 @@ handleSettings = (args, port) ->
 refreshCompleter = (request) -> completers[request.name].refresh()
 
 filterCompleter = (args, port) ->
+  # TODO: Is it intentional to split only on single spaces?  What about sequences of spaces? (smblott-github)
+  # TODO: This adds an extra (empty) term to `queryTerms` when the last character is a space. (smblott-github)
   queryTerms = if (args.query == "") then [] else args.query.split(" ")
   completers[args.name].filter(queryTerms, (results) -> port.postMessage({ id: args.id, results: results }))
 

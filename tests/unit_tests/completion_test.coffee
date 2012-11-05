@@ -202,6 +202,55 @@ context "RankingUtils",
   should "every term must match at least one thing (not matching)", ->
     assert.isTrue not RankingUtils.matches(["cat", "dog", "wolf"], "catapult", "hound dog")
 
+context "RankingUtils.wordRelevancy",
+  should "get a higher relevancy score in shorter URLs", ->
+    highScore = RankingUtils.wordRelevancy(["stack"], "http://stackoverflow.com/short",  null)
+    lowScore  = RankingUtils.wordRelevancy(["stack"], "http://stackoverflow.com/longer", null)
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score in shorter titles", ->
+    highScore = RankingUtils.wordRelevancy(["ffee"], "http://stackoverflow.com/same", "Coffeescript")
+    lowScore  = RankingUtils.wordRelevancy(["ffee"], "http://stackoverflow.com/same", "Coffeescript rocks")
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score for matching the start of a word (in a URL)", ->
+    lowScore  = RankingUtils.wordRelevancy(["stack"], "http://Xstackoverflow.com/same", null)
+    highScore = RankingUtils.wordRelevancy(["stack"], "http://stackoverflowX.com/same", null)
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score for matching the start of a word (in a title)", ->
+    lowScore  = RankingUtils.wordRelevancy(["ted"], "http://stackoverflow.com/same", "Dist racted")
+    highScore = RankingUtils.wordRelevancy(["ted"], "http://stackoverflow.com/same", "Distrac ted")
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score for matching a whole word (in a URL)", ->
+    lowScore  = RankingUtils.wordRelevancy(["com"], "http://stackoverflow.comX/same", null)
+    highScore = RankingUtils.wordRelevancy(["com"], "http://stackoverflowX.com/same", null)
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score for matching a whole word (in a title)", ->
+    lowScore  = RankingUtils.wordRelevancy(["com"], "http://stackoverflow.com/same", "abc comX")
+    highScore = RankingUtils.wordRelevancy(["com"], "http://stackoverflow.com/same", "abcX com")
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score for multiple matches (in a URL)", ->
+    lowScore  = RankingUtils.wordRelevancy(["stack"], "http://stackoverflow.com/xxxxx", null)
+    highScore = RankingUtils.wordRelevancy(["stack"], "http://stackoverflow.com/stack", null)
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
+  should "get a higher relevancy score for multiple matches (in a title)", ->
+    lowScore  = RankingUtils.wordRelevancy(["bbc"], "http://stackoverflow.com/same", "BBC Radio 4 (XBCr4)")
+    highScore = RankingUtils.wordRelevancy(["bbc"], "http://stackoverflow.com/same", "BBC Radio 4 (BBCr4)")
+    console.log "#{lowScore} < #{highScore}" if new Suggestion([], "", "", "", returns(1)).showRelevancy
+    assert.isTrue highScore > lowScore
+
 context "RegexpCache",
   should "RegexpCache is in fact caching (positive case)", ->
     assert.isTrue RegexpCache.get("this") is RegexpCache.get("this")
