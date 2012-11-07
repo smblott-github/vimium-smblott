@@ -13,7 +13,7 @@
 # It also has an attached "computeRelevancyFunction" which determines how well this item matches the given
 # query terms.
 class Suggestion
-  showRelevancy: false # Set this to true to render relevancy when debugging the ranking scores.
+  showRelevancy: true # Set this to true to render relevancy when debugging the ranking scores.
 
   # - type: one of [bookmark, history, tab].
   # - computeRelevancyFunction: a function which takes a Suggestion and returns a relevancy score
@@ -295,23 +295,139 @@ RankingUtils =
       return false unless matchedTerm
     true
 
+  # Weights used for scoring matches.
+  # `matchWeights.maximumScore` must be the sum of the three weights above it.
+  # TODO: These are fudge factors, they can be tuned.
+  matchWeights:
+    {
+      matchAnywhere:     1
+      matchStartOfWord:  1
+      matchWholeWord:    1
+      # The following must be the sum of the weights above; it is used for normalization.
+      # TODO: This can be calculated at runtime.
+      maximumScore:      3
+      #
+      # Calibration factor for balancing word relevancy and recency.
+      recencyCalibrator: 2.0/3.0
+      # The current value of 2.0/3.0 has the effect of:
+      #   - favoring the contribution of recency when matches are not on word boundaries   ( because 2.0/3.0 > (1)/3     )
+      #   - retaining the existing balance when matches are at the starts of words         ( because 2.0/3.0 = (1+1)/3   )
+      #   - favoring the contribution of word relevance when matches are on whole words    ( because 2.0/3.0 < (1+1+1)/3 )
+    }
+
+  # Calculate a score for matching `term` against `string`.
+  # The score is in the range [0, `matchWeights.maximumScore`], see above.
+  scoreTerm: (term, string) ->
+    score = 0
+    if string.match RegexpCache.get term
+      # Have match.
+      score += RankingUtils.matchWeights.matchAnywhere
+      if string.match RegexpCache.get term, "\\b"
+        # Have match at start of word.
+        score += RankingUtils.matchWeights.matchStartOfWord
+        if string.match RegexpCache.get term, "\\b", "\\b"
+          # Have match of whole word.
+          score += RankingUtils.matchWeights.matchWholeWord
+    score
+
+  # TODO: Remove this explanatory comment.
+  #
+  # The differences between the following version of `wordRelevancy` and the old one are:
+  #   - It reduces the score of matches which are not at the start of a word by a factor of 1/3.
+  #   - It reduces the score of other matches, but which are not whole words, by a factor of 2/3.
+  #   - These values come from the fudge factors in `matchWeights`, above.
+  #   - It makes no change to the score for matches which are whole words.
+  #   - It doesn't allow a poor urlScore to pull down the titleScore.
+  # 
+  # In the absence of matches on word boundaries, the relative ordering of
+  # scores for URLs and titles is unchanged vis-a-vis the old version.
+  #
+  # Overall, this change has two effects:
+  #
+  #   - It changes the *relative order* of scores awarded for word relevancy.
+  #     This is ok.  In fact, it's good: that is the intention.
+  #
+  #   - However, it also has another effect ...
+  #
+  #     It reduces the *absolute values* of word-relevancy scores, on average.
+  #
+  #     Overall, ranking depends both on word relevancy and recency.  Were the
+  #     absolute values of recency scores not *similarly adjusted*, recency
+  #     would dominate the overall ordering. This is why the fudge factor
+  #     `matchWeights.recencyCalibrator` has been introduced.
+  #
+  #     See also the comment in the definition of `matchWeights`, above.
+
   # Returns a number between [0, 1] indicating how often the query terms appear in the url and title.
   wordRelevancy: (queryTerms, url, title) ->
+    debugging = true
     queryLength = 0
     urlScore = 0.0
     titleScore = 0.0
+
+    # Calculate initial scores.
     for term in queryTerms
       queryLength += term.length
-      urlScore += 1 if url && RankingUtils.matches [term], url
-      titleScore += 1 if title && RankingUtils.matches [term], title
-    urlScore = urlScore / queryTerms.length
-    urlScore = urlScore * RankingUtils.normalizeDifference(queryLength, url.length)
+      urlScore += RankingUtils.scoreTerm term, url
+      titleScore += RankingUtils.scoreTerm term, title if title
+
+    maximumPossibleScore = RankingUtils.matchWeights.maximumScore * queryTerms.length
+
+    # Normalize urlScore.
+    urlScore /= maximumPossibleScore
+    console.log "THIS SHOULD NOT HAPPEN: urlScore exceeds 1.0: #{urlScore} #{url}" if debugging and 1.0 < urlScore
+    urlScore *= RankingUtils.normalizeDifference queryLength, url.length
+
     if title
-      titleScore = titleScore / queryTerms.length
-      titleScore = titleScore * RankingUtils.normalizeDifference(queryLength, title.length)
+      # Normalize titleScore (same as for urlScore, above).
+      # TODO: (smblott)
+      #       We've got basically the same code here, same as just as above.  Factor it out?
+      titleScore /= maximumPossibleScore
+      console.log "THIS SHOULD NOT HAPPEN: titleScore exceeds 1.0: #{titleScore} #{title}" if debugging and 1.0 < titleScore
+      titleScore *= RankingUtils.normalizeDifference queryLength, title.length
     else
       titleScore = urlScore
+
+    # ######################################################
+    # Up to this point, things are pretty much the same as they were in the old
+    # version, just with additional tests and their corresponding weights.
+    #
+    # However, there are three possible endings to this story ...
+
+    # ######################################################
+    # Ending #1: The old ending ...
+    #
+    # return (urlScore + titleScore) / 2
+    #
+    # It's difficult to argue with that.
+
+    # ######################################################
+    # Ending #2: An ending favoring `titleScore` ...
+    #
+    # Prefer matches in the title over matches in the URL.
+    # Here, this means "don't let a poor urlScore pull down the titleScore".
+    # For example, urlScore can be unreasonably poor if the URL is very long.
+    urlScore = titleScore if urlScore < titleScore
+
+    # Return the average.
     (urlScore + titleScore) / 2
+
+    # ######################################################
+    # Ending #3: An alternative (better?) ending ...
+    #
+    # return Math.max(urlScore, titleScore)
+    #
+    # Why?
+    #   - Don't let a poor urlScore pull down a good titleScore, as in Ending #2.
+    #   - But also don't let a poor titleScore pull down a good urlScore.
+    #   - The query may be targeting one or the other, so let the best one win.
+
+    # Pick one of these three endings.
+    #
+    # I (smblott) set off planning Ending #2.
+    # My son suggested Ending #3.
+    # I'm thinking he may be on to something.
+    # ######################################################
 
   # Returns a score between [0, 1] which indicates how recent the given timestamp is. Items which are over
   # a month old are counted as 0. This range is quadratic, so an item from one day ago has a much stronger
@@ -324,6 +440,11 @@ RankingUtils =
     # recencyScore is between [0, 1]. It is 1 when recenyDifference is 0. This quadratic equation will
     # incresingly discount older history entries.
     recencyScore = recencyDifference * recencyDifference * recencyDifference
+
+    # Calibrate recencyScore vis-a-vis word-relevancy scores.
+    # This does not change the relative order of recency scores.
+    # See also comment in the definition of `matchWeights`, above.
+    recencyScore *= matchWeights.recencyCalibrator
 
   # Takes the difference of two numbers and returns a number between [0, 1] (the percentage difference).
   normalizeDifference: (a, b) ->
@@ -349,6 +470,9 @@ RegexpCache =
   #   - string="go", prefix="\b", suffix=""
   #   - this returns regexp matching "google", but not "agog" (the "go" must occur at the start of a word)
   # TODO: `prefix` and `suffix` might be useful in richer word-relevancy scoring.
+  # Get rexexp for string from cache, creating the regexp if necessary.
+  # Regexp meta-characters in string are escaped.
+  # Regexp is wrapped in prefix/suffix, which may contain meta-characters.
   get: (string, prefix="", suffix="") ->
     @init() unless @initialized
     regexpString = string.replace(@escapeRegExp, "\\$&")
