@@ -297,6 +297,26 @@ RankingUtils =
       return false unless matchedTerm
     true
 
+  # TODO: Remove this long explanatory comment.
+  #
+  # The differences between the following version of `wordRelevancy` and the old one are:
+  #   - It reduces the score of matches which are not at the start of a word, using a factor of 1/3.
+  #   - It reduces the score of other matches, but which are not whole words, using a factor of 2/3.
+  #     (These values come from the fudge factors in `matchWeights`, below)
+  #   - It makes *no change* to the relevancy score for matches which are whole words.
+  #   - It recalibrates recency scores to generally retain the existing balance in light of the above.
+  #   - It doesn't allow a poor urlScore to pull down the titleScore (but see possible "Endings", below).
+  # 
+  # Note:
+  #     This change reduces the *absolute values* of word-relevancy scores, on average.
+  #
+  #     Overall, ranking depends both on word relevancy and recency.  Were the
+  #     absolute values of recency scores not *similarly adjusted*, recency
+  #     would dominate the overall ordering. This is why the fudge factor
+  #     `matchWeights.recencyCalibrator` has been introduced.
+  #
+  #     See also the comment in the definition of `matchWeights`, below.
+
   # Weights used for scoring matches.
   # `matchWeights.maximumScore` must be the sum of the three weights above it.
   # TODO: These are fudge factors, they can be tuned.
@@ -314,7 +334,7 @@ RankingUtils =
       # The current value of 2.0/3.0 has the effect of:
       #   - favoring the contribution of recency when matches are not on word boundaries   ( because 2.0/3.0 > (1)/3     )
       #   - retaining the existing balance when matches are at the starts of words         ( because 2.0/3.0 = (1+1)/3   )
-      #   - favoring the contribution of word relevance when matches are on whole words    ( because 2.0/3.0 < (1+1+1)/3 )
+      #   - increasing the contribution of word relevance when matches are on whole words  ( because 2.0/3.0 < (1+1+1)/3 )
     }
 
   # Calculate a score for matching `term` against `string`.
@@ -331,34 +351,6 @@ RankingUtils =
           # Have match of whole word.
           score += RankingUtils.matchWeights.matchWholeWord
     score
-
-  # TODO: Remove this explanatory comment.
-  #
-  # The differences between the following version of `wordRelevancy` and the old one are:
-  #   - It reduces the score of matches which are not at the start of a word by a factor of 1/3.
-  #   - It reduces the score of other matches, but which are not whole words, by a factor of 2/3.
-  #   - These values come from the fudge factors in `matchWeights`, above.
-  #   - It makes no change to the score for matches which are whole words.
-  #   - It doesn't allow a poor urlScore to pull down the titleScore.
-  # 
-  # In the absence of matches on word boundaries, the relative ordering of
-  # scores for URLs and titles is unchanged vis-a-vis the old version.
-  #
-  # Overall, this change has two effects:
-  #
-  #   - It changes the *relative order* of scores awarded for word relevancy.
-  #     This is ok.  In fact, it's good: that is the intention.
-  #
-  #   - However, it also has another effect ...
-  #
-  #     It reduces the *absolute values* of word-relevancy scores, on average.
-  #
-  #     Overall, ranking depends both on word relevancy and recency.  Were the
-  #     absolute values of recency scores not *similarly adjusted*, recency
-  #     would dominate the overall ordering. This is why the fudge factor
-  #     `matchWeights.recencyCalibrator` has been introduced.
-  #
-  #     See also the comment in the definition of `matchWeights`, above.
 
   # Returns a number between [0, 1] indicating how often the query terms appear in the url and title.
   wordRelevancy: (queryTerms, url, title) ->
@@ -442,6 +434,24 @@ RankingUtils =
     # I'm thinking now that he may be on to something.
     # ######################################################
 
+  # Returns a number between [0, 1] indicating how often the query terms appear in the url and title.
+  oldWordRelevancy: (queryTerms, url, title) ->
+    queryLength = 0
+    urlScore = 0.0
+    titleScore = 0.0
+    for term in queryTerms
+      queryLength += term.length
+      urlScore += 1 if url && RankingUtils.matches [term], url
+      titleScore += 1 if title && RankingUtils.matches [term], title
+    urlScore = urlScore / queryTerms.length
+    urlScore = urlScore * RankingUtils.normalizeDifference(queryLength, url.length)
+    if title
+      titleScore = titleScore / queryTerms.length
+      titleScore = titleScore * RankingUtils.normalizeDifference(queryLength, title.length)
+    else
+      titleScore = urlScore
+    (urlScore + titleScore) / 2
+
   # Returns a score between [0, 1] which indicates how recent the given timestamp is. Items which are over
   # a month old are counted as 0. This range is quadratic, so an item from one day ago has a much stronger
   # score than an item from two days ago.
@@ -483,9 +493,6 @@ RegexpCache =
   #   - string="go", prefix="\b", suffix=""
   #   - this returns regexp matching "google", but not "agog" (the "go" must occur at the start of a word)
   # TODO: `prefix` and `suffix` might be useful in richer word-relevancy scoring.
-  # Get rexexp for string from cache, creating the regexp if necessary.
-  # Regexp meta-characters in string are escaped.
-  # Regexp is wrapped in prefix/suffix, which may contain meta-characters.
   get: (string, prefix="", suffix="") ->
     @init() unless @initialized
     regexpString = string.replace(@escapeRegExp, "\\$&")
