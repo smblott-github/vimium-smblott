@@ -50,9 +50,10 @@ class Suggestion
   pushMatchingRanges: (string,term,ranges) ->
     textPosition = 0
     # Split `string` into a (flat) list of pairs:
-    #   - splits[i%2] is unmatched text
-    #   - splits[(i%2)+1] is the following matched text (matching `term`)
-    #     (except for the final element, for which there is no following matched text).
+    #   - for i=0,2,4,6,...
+    #     - splits[i] is unmatched text
+    #     - splits[i+1] is the following matched text (matching `term`)
+    #       (except for the final element, for which there is no following matched text).
     # Example:
     #   - string = "Abacab"
     #   - term = "a"
@@ -205,7 +206,7 @@ class DomainCompleter
     for domain in domainCandidates
       recencyScore = RankingUtils.recencyScore(@domains[domain].lastVisitTime || 0)
       wordRelevancy = RankingUtils.wordRelevancy(queryTerms, domain, null)
-      score = wordRelevancy + Math.max(recencyScore, wordRelevancy) / 2
+      score = (wordRelevancy + Math.max(recencyScore, wordRelevancy)) / 2
       results.push([domain, score])
     results.sort (a, b) -> b[1] - a[1]
     results
