@@ -282,8 +282,15 @@ RankingUtils =
       return false unless matchedTerm
     true
 
-  # Returns a number between [0, 1] indicating how often the query terms appear in the url and title.
   wordRelevancy: (queryTerms, url, title) ->
+    Utils.timer @, @wwordRelevancy, queryTerms, url, title
+    @count = if @count then @count + 1 else 1
+    console.log Utils.timerAverage() unless @count % 100
+
+  wwordRelevancy: (queryTerms, url, title) ->
+    if WordRelevancyCache.useCache
+      cachedScore = WordRelevancyCache.lookup queryTerms, url, title
+      return cachedScore if cachedScore?
     queryLength = 0
     urlScore = 0.0
     titleScore = 0.0
@@ -298,7 +305,10 @@ RankingUtils =
       titleScore = titleScore * RankingUtils.normalizeDifference(queryLength, title.length)
     else
       titleScore = urlScore
-    (urlScore + titleScore) / 2
+    if WordRelevancyCache.useCache
+      WordRelevancyCache.insert queryTerms, url, title, (urlScore + titleScore) / 2
+    else
+      (urlScore + titleScore) / 2
 
   # Returns a score between [0, 1] which indicates how recent the given timestamp is. Items which are over
   # a month old are counted as 0. This range is quadratic, so an item from one day ago has a much stronger
@@ -402,6 +412,35 @@ HistoryCache.binarySearch = (targetElement, array, compareFunction) ->
       return middle
   # We didn't find the element. Return the position where it should be in this array.
   return if compareFunction(element, targetElement) < 0 then middle + 1 else middle
+
+# We cache regexps word relevancy scores because they are used frequently and
+# are relatively expensive to compute.
+WordRelevancyCache =
+  useCache: true
+  cache: {}
+
+  # Look up a cached word relevancy score.
+  # The cache is a tree of dictionaries:
+  #   - first level indexed by title
+  #   - the second by url (so, in most cases it contains just a single entry)
+  #   - the third by the number of query terms; this eliminates the possibility of unintended classes
+  #   - then some number of levels of query terms
+  #   - at the leaf, a final dictionary contains the cached score
+  lookup: (queryTerms, url, title) ->
+    cache = @cache[title]?[url]?[queryTerms.length]
+    for term in queryTerms
+      cache = cache?[term]
+    return cache?.score
+
+  # Insert score into word relevancy cache.
+  insert: (queryTerms, url, title, score) ->
+    cache = @cache
+    cache = cache[title] || cache[title] = {}
+    cache = cache[url] || cache[url] = {}
+    cache = cache[queryTerms.length] || cache[queryTerms.length] = {}
+    for term in queryTerms
+      cache = cache[term] || cache[term] = {}
+    cache.score = score
 
 root = exports ? window
 root.Suggestion = Suggestion

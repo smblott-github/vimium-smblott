@@ -133,7 +133,41 @@ Utils =
   zip: (arrays) ->
     arrays[0].map (_,i) ->
       arrays.map( (array) -> array[i] )
-    
+
+  # Microsecond timing functions for performance testing, if available.
+  # For timing to work: the `--enable-benchmarking` chrome option must be available, and must be used at start up.
+  # To time a function invocation:
+  #   - replace a call `@func arg1, arg2, arg3` with a call `Utils.timer @, @func, arg1, arg2, arg3`.
+  #     e.g. Utils.timer @, @wordRelevancy, queryTerms, url, title
+  #   - replace a call `Utils.convertToUrl string` with `Utils.timer Utils, Utils.convertToUrl, string`
+  timer: (that, func, args...) ->
+    if chrome.Interval
+      if not @interval
+        @interval =
+          timer: new chrome.Interval()
+          factor: 0.5
+      @interval.timer.start()
+    result = func.apply that, args
+    if chrome.Interval
+      @interval.timer.stop()
+      @interval.average =
+        if @interval?.average?
+          @interval.timer.microseconds()
+        else
+          @interval.factor * @interval.timer.microseconds() + (1 - @interval.factor) * @interval.average
+    result
+  
+  # Returns a weighted average of previous timings, with more recent timings having a greater weight.
+  timerAverage: () ->
+    if chrome.Interval and @interval?.average?
+      @interval.average
+    else
+      0
+
+  # Reset timer.
+  timerReset: ->
+    delete @interval if @interval
+
 # This creates a new function out of an existing function, where the new function takes fewer arguments. This
 # allows us to pass around functions instead of functions + a partial list of arguments.
 Function::curry = ->
