@@ -128,7 +128,7 @@ class BookmarkCompleter
         i = HistoryCache.binarySearch { url: bookmark.url }, history, HistoryCache.compareHistoryByUrl
         historyEntry = if history[i]?.url == bookmark.url then history[i] else null
         suggestionTitle = if usePathAndTitle then bookmark.pathAndTitle else bookmark.title
-        new Suggestion(@currentSearch.queryTerms, "bookmark", bookmark.url, suggestionTitle, @computeRelevancy)
+        new Suggestion(@currentSearch.queryTerms, "bookmark", bookmark.url, suggestionTitle, @computeRelevancy, historyEntry)
       onComplete = @currentSearch.onComplete
       @currentSearch = null
       onComplete(suggestions)
