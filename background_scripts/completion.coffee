@@ -101,6 +101,7 @@ class Suggestion
 
 
 class BookmarkCompleter
+  folderSeparator: "/"
   currentSearch: null
   # These bookmarks are loaded asynchronously when refresh() is called.
   bookmarks: null
@@ -112,17 +113,22 @@ class BookmarkCompleter
   onBookmarksLoaded: -> @performSearch() if @currentSearch
 
   performSearch: ->
+    # If the folder separator character is in the query, then we'll use the bookmark's full path as its title.
+    # Otherwise, we'll just use the its regular title.
+    usePathAndTitle = @currentSearch.queryTerms.reduce ((prev,term) => prev || term.indexOf(@folderSeparator) != -1), false
     results =
       if @currentSearch.queryTerms.length > 0
         @bookmarks.filter (bookmark) =>
-          RankingUtils.matches(@currentSearch.queryTerms, bookmark.url, bookmark.title)
+          suggestionTitle = if usePathAndTitle then bookmark.pathAndTitle else bookmark.title
+          RankingUtils.matches(@currentSearch.queryTerms, bookmark.url, suggestionTitle)
       else
         []
     HistoryCache.use (history) =>
       suggestions = results.map (bookmark) =>
         i = HistoryCache.binarySearch { url: bookmark.url }, history, HistoryCache.compareHistoryByUrl
         historyEntry = if history[i]?.url == bookmark.url then history[i] else null
-        new Suggestion(@currentSearch.queryTerms, "bookmark", bookmark.url, bookmark.title, @computeRelevancy, historyEntry)
+        suggestionTitle = if usePathAndTitle then bookmark.pathAndTitle else bookmark.title
+        new Suggestion(@currentSearch.queryTerms, "bookmark", bookmark.url, suggestionTitle, @computeRelevancy, historyEntry)
       onComplete = @currentSearch.onComplete
       @currentSearch = null
       onComplete(suggestions)
@@ -135,22 +141,15 @@ class BookmarkCompleter
 
   # Traverses the bookmark hierarchy, and returns a flattened list of all bookmarks.
   traverseBookmarks: (bookmarks) ->
-    includeBookmarkFolders = Settings.get("includeBookmarkFolders")
-    parents = {} if includeBookmarkFolders
     results = []
-    toVisit = bookmarks.reverse()
-    while toVisit.length > 0
-      bookmark = toVisit.pop()
-      results.push(bookmark)
-      if includeBookmarkFolders
-        parentTitle = parents[bookmark.id]?.title || ""
-        bookmark.title = parentTitle + "/" + bookmark.title if bookmark.title
-      # Schedule processing of children.
-      if bookmark.children
-        if includeBookmarkFolders
-          bookmark.children.map (bm) -> parents[bm.id] = bookmark
-        toVisit.push.apply(toVisit, bookmark.children.reverse())
+    bookmarks.forEach (folder) => @traverseBookmarksRecursive folder, results
     results
+
+  # Recursive helper for `traverseBookmarks`.
+  traverseBookmarksRecursive: (bookmark, results, parent={pathAndTitle:""}) ->
+    bookmark.pathAndTitle = if bookmark.title then parent.pathAndTitle + @folderSeparator + bookmark.title else parent.pathAndTitle
+    results.push bookmark
+    bookmark.children.forEach((child) => @traverseBookmarksRecursive child, results, bookmark) if bookmark.children
 
   computeRelevancy: (suggestion) ->
     lastVisitTime = suggestion?.extraRelevancyData?.lastVisitTime || 0.0
