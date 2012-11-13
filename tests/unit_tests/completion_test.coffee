@@ -41,6 +41,9 @@ context "HistoryCache",
       should "return length - 1 if it should be at the end of the list", ->
         assert.equal 0, HistoryCache.binarySearch(3, [3, 5, 8], @compare)
 
+      should "return one passed end of array (so: array.length) if greater than last element in array", ->
+        assert.equal 3, HistoryCache.binarySearch(10, [3, 5, 8], @compare)
+
       should "found return the position if it's between two elements", ->
         assert.equal 1, HistoryCache.binarySearch(4, [3, 5, 8], @compare)
         assert.equal 2, HistoryCache.binarySearch(7, [3, 5, 8], @compare)
@@ -51,9 +54,11 @@ context "HistoryCache",
       @history2 = { url: "a.com", lastVisitTime: 10 }
       history = [@history1, @history2]
       @onVisitedListener = null
+      @onVisitRemovedListener = null
       global.chrome.history =
         search: (options, callback) -> callback(history)
         onVisited: { addListener: (@onVisitedListener) => }
+        onVisitRemoved: { addListener: (@onVisitRemovedListener) => }
       HistoryCache.reset()
 
     should "store visits sorted by url ascending", ->
@@ -75,6 +80,30 @@ context "HistoryCache",
       HistoryCache.use (@results) =>
       assert.arrayEqual [newSite, @history1], @results
 
+    should "(not) remove page from the history, when page is not in history (it should be a no-op)", ->
+      HistoryCache.use (@results) =>
+      assert.arrayEqual [@history2, @history1], @results
+      toRemove = { urls: [ "x.com" ], allHistory: false }
+      @onVisitRemovedListener(toRemove)
+      HistoryCache.use (@results) =>
+      assert.arrayEqual [@history2, @history1], @results
+
+    should "remove pages from the history", ->
+      HistoryCache.use (@results) =>
+      assert.arrayEqual [@history2, @history1], @results
+      toRemove = { urls: [ "a.com" ], allHistory: false }
+      @onVisitRemovedListener(toRemove)
+      HistoryCache.use (@results) =>
+      assert.arrayEqual [@history1], @results
+
+    should "remove all pages from the history", ->
+      HistoryCache.use (@results) =>
+      assert.arrayEqual [@history2, @history1], @results
+      toRemove = { allHistory: true }
+      @onVisitRemovedListener(toRemove)
+      HistoryCache.use (@results) =>
+      assert.arrayEqual [], @results
+
 context "history completer",
   setup ->
     @history1 = { title: "history1", url: "history1.com", lastVisitTime: hours(1) }
@@ -83,6 +112,7 @@ context "history completer",
     global.chrome.history =
       search: (options, callback) => callback([@history1, @history2])
       onVisited: { addListener: -> }
+      onVisitRemoved: { addListener: -> }
 
     @completer = new HistoryCompleter()
 
@@ -102,7 +132,9 @@ context "domain completer",
     @history2 = { title: "history2", url: "http://history2.com", lastVisitTime: hours(1) }
 
     stub(HistoryCache, "use", (onComplete) => onComplete([@history1, @history2]))
-    global.chrome.history = { onVisited: { addListener: -> } }
+    global.chrome.history =
+      onVisited: { addListener: -> }
+      onVisitRemoved: { addListener: -> }
     stub(Date, "now", returns(hours(24)))
 
     @completer = new DomainCompleter()
@@ -112,13 +144,57 @@ context "domain completer",
     assert.arrayEqual ["history1.com"], results.map (result) -> result.url
 
   should "pick domains which are more recent", ->
-    # This domains are the same except for their last visited time.
+    # These domains are the same except for their last visited time.
     assert.equal "history1.com", filterCompleter(@completer, ["story"])[0].url
     @history2.lastVisitTime = hours(3)
     assert.equal "history2.com", filterCompleter(@completer, ["story"])[0].url
 
   should "returns no results when there's more than one query term, because clearly it's not a domain", ->
     assert.arrayEqual [], filterCompleter(@completer, ["his", "tory"])
+
+context "domain completer (removing entries)",
+  setup ->
+    @history1 = { title: "history1", url: "http://history1.com", lastVisitTime: hours(2) }
+    @history2 = { title: "history2", url: "http://history2.com", lastVisitTime: hours(1) }
+    @history3 = { title: "history2something", url: "http://history2.com/something", lastVisitTime: hours(0) }
+
+    stub(HistoryCache, "use", (onComplete) => onComplete([@history1, @history2, @history3]))
+    @onVisitedListener = null
+    @onVisitRemovedListener = null
+    global.chrome.history =
+      onVisited: { addListener: (@onVisitedListener) => }
+      onVisitRemoved: { addListener: (@onVisitRemovedListener) => }
+    stub(Date, "now", returns(hours(24)))
+
+    @completer = new DomainCompleter()
+    # Force installation of listeners.
+    filterCompleter(@completer, ["story"])
+
+  should "remove 1 entry for domain with reference count of 1", ->
+    @onVisitRemovedListener { allHistory: false, urls: [@history1.url] }
+    assert.equal "history2.com", filterCompleter(@completer, ["story"])[0].url
+    assert.equal 0, filterCompleter(@completer, ["story1"]).length
+
+  should "remove 2 entries for domain with reference count of 2", ->
+    @onVisitRemovedListener { allHistory: false, urls: [@history2.url] }
+    assert.equal "history2.com", filterCompleter(@completer, ["story2"])[0].url
+    @onVisitRemovedListener { allHistory: false, urls: [@history3.url] }
+    assert.equal 0, filterCompleter(@completer, ["story2"]).length
+    assert.equal "history1.com", filterCompleter(@completer, ["story"])[0].url
+
+  should "remove 3 (all) matching domain entries", ->
+    @onVisitRemovedListener { allHistory: false, urls: [@history2.url] }
+    @onVisitRemovedListener { allHistory: false, urls: [@history1.url] }
+    @onVisitRemovedListener { allHistory: false, urls: [@history3.url] }
+    assert.equal 0, filterCompleter(@completer, ["story"]).length
+
+  should "remove 3 (all) matching domain entries, and do it all at once", ->
+    @onVisitRemovedListener { allHistory: false, urls: [ @history2.url, @history1.url, @history3.url ] }
+    assert.equal 0, filterCompleter(@completer, ["story"]).length
+
+  should "remove *all* domain entries", ->
+    @onVisitRemovedListener { allHistory: true }
+    assert.equal 0, filterCompleter(@completer, ["story"]).length
 
 context "tab completer",
   setup ->
@@ -152,6 +228,34 @@ context "suggestions",
     suggestion = new Suggestion(["queryterm"], "tab", "http://ninjawords.com", "ninjawords", returns(1))
     assert.equal -1, suggestion.generateHtml().indexOf("http://ninjawords.com")
 
+  should "extract ranges matching term (simple case, two matches)", ->
+    ranges = []
+    [ one, two, three ] = [ "one", "two", "three" ]
+    suggestion = new Suggestion([], "", "", "", returns(1))
+    suggestion.pushMatchingRanges("#{one}#{two}#{three}#{two}#{one}", two, ranges)
+    assert.equal 2, Utils.zip([ ranges, [ [3,6], [11,14] ] ]).filter((pair) -> pair[0][0] == pair[1][0] and pair[0][1] == pair[1][1]).length
+
+  should "extract ranges matching term (two matches, one at start of string)", ->
+    ranges = []
+    [ one, two, three ] = [ "one", "two", "three" ]
+    suggestion = new Suggestion([], "", "", "", returns(1))
+    suggestion.pushMatchingRanges("#{two}#{three}#{two}#{one}", two, ranges)
+    assert.equal 2, Utils.zip([ ranges, [ [0,3], [8,11] ] ]).filter((pair) -> pair[0][0] == pair[1][0] and pair[0][1] == pair[1][1]).length
+
+  should "extract ranges matching term (two matches, one at end of string)", ->
+    ranges = []
+    [ one, two, three ] = [ "one", "two", "three" ]
+    suggestion = new Suggestion([], "", "", "", returns(1))
+    suggestion.pushMatchingRanges("#{one}#{two}#{three}#{two}", two, ranges)
+    assert.equal 2, Utils.zip([ ranges, [ [3,6], [11,14] ] ]).filter((pair) -> pair[0][0] == pair[1][0] and pair[0][1] == pair[1][1]).length
+
+  should "extract ranges matching term (no matches)", ->
+    ranges = []
+    [ one, two, three ] = [ "one", "two", "three" ]
+    suggestion = new Suggestion([], "", "", "", returns(1))
+    suggestion.pushMatchingRanges("#{one}#{two}#{three}#{two}#{one}", "does-not-match", ranges)
+    assert.equal 0, ranges.length
+
 context "RankingUtils",
   should "do a case insensitive match", ->
     assert.isTrue RankingUtils.matches(["aRi"], "MARIO", "MARio")
@@ -173,6 +277,31 @@ context "RankingUtils",
 
   should "every term must match at least one thing (not matching)", ->
     assert.isTrue not RankingUtils.matches(["cat", "dog", "wolf"], "catapult", "hound dog")
+
+context "RegexpCache",
+  should "RegexpCache is in fact caching (positive case)", ->
+    assert.isTrue RegexpCache.get("this") is RegexpCache.get("this")
+
+  should "RegexpCache is in fact caching (negative case)", ->
+    assert.isTrue RegexpCache.get("this") isnt RegexpCache.get("that")
+
+  should "RegexpCache prefix/suffix wrapping is working (positive case)", ->
+    assert.isTrue RegexpCache.get("this", "(", ")") is RegexpCache.get("this", "(", ")")
+
+  should "RegexpCache prefix/suffix wrapping is working (negative case)", ->
+    assert.isTrue RegexpCache.get("this", "(", ")") isnt RegexpCache.get("this")
+
+  should "search for a string", ->
+    assert.isTrue "hound dog".search(RegexpCache.get("dog")) == 6
+
+  should "search for a string which isn't there", ->
+    assert.isTrue "hound dog".search(RegexpCache.get("cat")) == -1
+
+  should "search for a string with a prefix/suffix (positive case)", ->
+    assert.isTrue "hound dog".search(RegexpCache.get("dog", "\\b", "\\b")) == 6
+
+  should "search for a string with a prefix/suffix (negative case)", ->
+    assert.isTrue "hound dog".search(RegexpCache.get("do", "\\b", "\\b")) == -1
 
 # A convenience wrapper around completer.filter() so it can be called synchronously in tests.
 filterCompleter = (completer, queryTerms) ->

@@ -94,7 +94,8 @@ class VomnibarUI
     action = @actionFromKeyEvent(event)
     return true unless action # pass through
 
-    openInNewTab = @forceNewTab || (event.shiftKey || KeyboardUtils.isPrimaryModifierKey(event))
+    openInNewTab = @forceNewTab ||
+      (event.shiftKey || event.ctrlKey || KeyboardUtils.isPrimaryModifierKey(event))
     if (action == "dismiss")
       @hide()
     else if (action == "up")
@@ -214,7 +215,9 @@ extend BackgroundCompleter,
     navigateToUrl: (url, openInNewTab) ->
       # If the URL is a bookmarklet prefixed with javascript:, we shouldn't open that in a new tab.
       if url.startsWith "javascript:"
-        eval decodeURIComponent(url["javascript:".length..])
+        script = document.createElement 'script'
+        script.textContent = decodeURIComponent(url["javascript:".length..])
+        (document.head || document.documentElement).appendChild script
       else
         chrome.extension.sendRequest(
           handler: if openInNewTab then "openUrlInNewTab" else "openUrlInCurrentTab"

@@ -46,12 +46,33 @@ class Suggestion
     url = url.substring(url, url.length - 1) if url[url.length - 1] == "/"
     url
 
+  # Push the ranges within `string` which match `term` onto `ranges`.
+  pushMatchingRanges: (string,term,ranges) ->
+    textPosition = 0
+    # Split `string` into a (flat) list of pairs:
+    #   - for i=0,2,4,6,...
+    #     - splits[i] is unmatched text
+    #     - splits[i+1] is the following matched text (matching `term`)
+    #       (except for the final element, for which there is no following matched text).
+    # Example:
+    #   - string = "Abacab"
+    #   - term = "a"
+    #   - splits = [ "", "A",    "b", "a",    "c", "a",    b" ]
+    #                UM   M       UM   M       UM   M      UM      (M=Matched, UM=Unmatched)
+    splits = string.split(RegexpCache.get(term, "(", ")"))
+    for index in [0..splits.length-2] by 2
+      unmatchedText = splits[index]
+      matchedText = splits[index+1]
+      # Add the indices spanning `matchedText` to `ranges`.
+      textPosition += unmatchedText.length
+      ranges.push([textPosition, textPosition + matchedText.length])
+      textPosition += matchedText.length
+
   # Wraps each occurence of the query terms in the given string in a <span>.
   highlightTerms: (string) ->
     ranges = []
     for term in @queryTerms
-      i = string.search(RegexpCache.get(term))
-      ranges.push([i, i + term.length]) if i >= 0
+      @pushMatchingRanges string, term, ranges
 
     return string if ranges.length == 0
 
@@ -148,7 +169,11 @@ class HistoryCompleter
 # The domain completer is designed to match a single-word query which looks like it is a domain. This supports
 # the user experience where they quickly type a partial domain, hit tab -> enter, and expect to arrive there.
 class DomainCompleter
-  domains: null # A map of domain -> history
+  # A map of domain -> { entry: <historyEntry>, referenceCount: <count> }
+  #  - `entry` is the most recently accessed page in the History within this domain.
+  #  - `referenceCount` is a count of the number of History entries within this domain.
+  #     If `referenceCount` goes to zero, the domain entry can and should be deleted.
+  domains: null
 
   filter: (queryTerms, onComplete) ->
     return onComplete([]) if queryTerms.length > 1
@@ -169,9 +194,9 @@ class DomainCompleter
   sortDomainsByRelevancy: (queryTerms, domainCandidates) ->
     results = []
     for domain in domainCandidates
-      recencyScore = RankingUtils.recencyScore(@domains[domain].lastVisitTime || 0)
+      recencyScore = RankingUtils.recencyScore(@domains[domain].entry.lastVisitTime || 0)
       wordRelevancy = RankingUtils.wordRelevancy(queryTerms, domain, null)
-      score = wordRelevancy + Math.max(recencyScore, wordRelevancy) / 2
+      score = (wordRelevancy + Math.max(recencyScore, wordRelevancy)) / 2
       results.push([domain, score])
     results.sort (a, b) -> b[1] - a[1]
     results
@@ -179,18 +204,27 @@ class DomainCompleter
   populateDomains: (onComplete) ->
     HistoryCache.use (history) =>
       @domains = {}
-      history.forEach (entry) =>
-        # We want each key in our domains hash to point to the most recent History entry for that domain.
-        domain = @parseDomain(entry.url)
-        if domain
-          previousEntry = @domains[domain]
-          @domains[domain] = entry if !previousEntry || (previousEntry.lastVisitTime < entry.lastVisitTime)
+      history.forEach (entry) => @onPageVisited entry
       chrome.history.onVisited.addListener(@onPageVisited.bind(this))
+      chrome.history.onVisitRemoved.addListener(@onVisitRemoved.bind(this))
       onComplete()
 
   onPageVisited: (newPage) ->
     domain = @parseDomain(newPage.url)
-    @domains[domain] = newPage if domain
+    if domain
+      slot = @domains[domain] ||= { entry: newPage, referenceCount: 0 }
+      # We want each entry in our domains hash to point to the most recent History entry for that domain.
+      slot.entry = newPage if slot.entry.lastVisitTime < newPage.lastVisitTime
+      slot.referenceCount += 1
+
+  onVisitRemoved: (toRemove) ->
+    if toRemove.allHistory
+      @domains = {}
+    else
+      toRemove.urls.forEach (url) =>
+        domain = @parseDomain(url)
+        if domain and @domains[domain] and ( @domains[domain].referenceCount -= 1 ) == 0
+          delete @domains[domain]
 
   parseDomain: (url) -> url.split("/")[2] || ""
 
@@ -307,12 +341,21 @@ RegexpCache =
 
   clear: -> @cache = {}
 
-  get: (string) ->
+  # Get rexexp for `string` from cache, creating it if necessary.
+  # Regexp meta-characters in `string` are escaped.
+  # Regexp is wrapped in `prefix`/`suffix`, which may contain meta-characters (these are not escaped).
+  # With their default values, `prefix` and `suffix` have no effect.
+  # Example:
+  #   - string="go", prefix="\b", suffix=""
+  #   - this returns regexp matching "google", but not "agog" (the "go" must occur at the start of a word)
+  # TODO: `prefix` and `suffix` might be useful in richer word-relevancy scoring.
+  get: (string, prefix="", suffix="") ->
     @init() unless @initialized
-    @cache[string] ||= @escapeRegexp(string)
-
-  # Creates a Regexp from the given string, with all special Regexp characters escaped.
-  escapeRegexp: (string) -> new RegExp(string.replace(@escapeRegExp, "\\$&"), "i")
+    regexpString = string.replace(@escapeRegExp, "\\$&")
+    # Avoid cost of constructing new strings if prefix/suffix are empty (which is expected to be a common case).
+    regexpString = prefix + regexpString if prefix
+    regexpString = regexpString + suffix if suffix
+    @cache[regexpString] ||= new RegExp(regexpString, "i")
 
 # Provides cached access to Chrome's history. As the user browses to new pages, we add those pages to this
 # history cache.
@@ -335,6 +378,7 @@ HistoryCache =
       history.sort @compareHistoryByUrl
       @history = history
       chrome.history.onVisited.addListener(@onPageVisited.bind(this))
+      chrome.history.onVisitRemoved.addListener(@onVisitRemoved.bind(this))
       callback(@history) for callback in @callbacks
       @callbacks = null
 
@@ -352,6 +396,16 @@ HistoryCache =
       @history[i] = newPage
     else
       @history.splice(i, 0, newPage)
+
+  # When a page is removed from the chrome history, remove it from the vimium history too.
+  onVisitRemoved: (toRemove) ->
+    if toRemove.allHistory
+      @history = []
+    else
+      toRemove.urls.forEach (url) =>
+        i = HistoryCache.binarySearch({url:url}, @history, @compareHistoryByUrl)
+        if i < @history.length and @history[i].url == url
+          @history.splice(i, 1)
 
 # Returns the matching index or the closest matching index if the element is not found. That means you
 # must check the element at the returned index to know whether the element was actually found.
@@ -382,3 +436,4 @@ root.DomainCompleter = DomainCompleter
 root.TabCompleter = TabCompleter
 root.HistoryCache = HistoryCache
 root.RankingUtils = RankingUtils
+root.RegexpCache = RegexpCache
