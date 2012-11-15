@@ -152,10 +152,10 @@ class BookmarkCompleter
     bookmark.children.forEach((child) => @traverseBookmarksRecursive child, results, bookmark) if bookmark.children
 
   computeRelevancy: (suggestion) ->
-    lastVisitTime = suggestion?.extraRelevancyData?.lastVisitTime || 0.0
-    recencyScore = RankingUtils.recencyScore(lastVisitTime)
+    # lastVisitTime = suggestion?.extraRelevancyData?.lastVisitTime || 0.0
+    # recencyScore = RankingUtils.recencyScore(lastVisitTime)
     wordRelevancy = RankingUtils.wordRelevancy(suggestion.queryTerms, suggestion.url, suggestion.title)
-    (wordRelevancy + Math.max(recencyScore, wordRelevancy)) / 2
+    # (wordRelevancy + Math.max(recencyScore, wordRelevancy)) / 2
 
 class HistoryCompleter
   filter: (queryTerms, onComplete) ->
