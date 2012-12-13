@@ -139,7 +139,6 @@ initializeWhenEnabled = (response) ->
   document.addEventListener("blur", onBlurCapturePhase, true)
   document.addEventListener("DOMActivate", onDOMActivate, true)
   enterInsertModeIfElementIsFocused()
-  console.log "setting passkeys: #{response.passkeys}"
   passkeys = response.passkeys
 
 #
@@ -347,7 +346,6 @@ extend window,
 #
 
 isPasskey = ( keyChar ) ->
-  console.log "isPasskey: #{keyChar} #{passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0}"
   passkeys && typeof(passkeys) == "string" and passkeys.indexOf(keyChar) >= 0
 
 #
@@ -377,7 +375,6 @@ onKeypress = (event) ->
         DomUtils.suppressEvent(event)
       else if (!isInsertMode() && !findMode)
         if isPasskey keyChar
-          console.log "onKeypress: passing #{keyChar}"
           return undefined
         if (currentCompletionKeys.indexOf(keyChar) != -1)
           DomUtils.suppressEvent(event)
@@ -459,7 +456,6 @@ onKeydown = (event) ->
     #   only if not "<ESC>
     else
       if isPasskey KeyboardUtils.getKeyChar(event)
-        console.log "onKeydown: passing #{KeyboardUtils.getKeyChar(event)}"
         return undefined
 
   # Added to prevent propagating this event to other listeners if it's one that'll trigger a Vimium command.
