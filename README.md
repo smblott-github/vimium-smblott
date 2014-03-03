@@ -1,7 +1,57 @@
 Vimium - The Hacker's Browser
 =============================
 
-[![Build Status](https://secure.travis-ci.org/philc/vimium.png?branch=master)](https://travis-ci.org/philc/vimium)
+Vimium+
+-------
+
+Vimium+ is an extended version of [Vimium](https://github.com/philc/vimium)
+incorporating a number of improvements.
+
+The [master](https://github.com/smblott-github/vimium/tree/master) branch is pretty much a copy of Vimium itself.  All of the new
+stuff is in the [Vimium+
+branch](https://github.com/smblott-github/vimium/tree/vimium+).
+
+Features:
+
+- Options are shared between installations.  So, if you use Vimium+ on a laptop
+  and on a desktop, option changes made on one are propagated automatically to
+  the other.
+
+- Selective disabling of Vimium key bindings.  Vanilla Vimium is either enabled or
+  disabled on a page.  With Vimium+, if a site is listed as disabled but the listing is
+  followed by a sequence of keys, then only those keys are disabled.  For
+  example, to use Google's `j` and `k` bindings on GMail, use
+  `https://mail.google.com/* jk` -- now, just those two keys are disabled, all
+  other Vimium keys are handled by Vimium, as usual.
+
+- Smartcase.  Vomnibar searches are case insensitive, except if the search term
+  includes a capital letter, in which case they are case sensitive. Tip: give
+  your bookmarks names which include shortcuts, all in capital letters.  For
+  example, include the text `GML` in your GMail bookmark, and go directly to it
+  by typing capital letters.
+
+- Better scoring of bookmark and history searches.  In particular, a match at
+  the start of a word scores higher, and a match of a whole word scores higher
+  still.
+
+- Even better scoring of bookmark searches.  In particular, recency is included
+  in the relevancy calculation.  So bookmarks you use frequently should appear
+  nearer the top of the list.
+
+- Search bookmarks by folder.  If a bookmark search includes the character `/`,
+  then search terms are matched against the whole bookmark path, not just the
+  final bookmark name.  For example, `/mob` will match bookmarks in the
+  `/Mobile Bookmarks` folder.
+
+- Bindings for `goInc` and `goDec` (`C-a` and `C-X`, respectively); these
+  increment and decrement the last number on the current URL.
+
+- The `ENTER` key on an empty vomnibar just cancels (as opposed to opening a new tab).
+
+What follows is the original Vimium README...
+
+Vimium
+------
 
 Vimium is a Chrome extension that provides keyboard-based navigation and control in the spirit of the Vim
 editor.
@@ -82,6 +132,8 @@ Additional advanced browsing commands:
     <a-f>   open multiple links in a new tab
     gi      focus the first (or n-th) text input box on the page
     gu      go up one level in the URL hierarchy
+    <c-a>   increment the last number found in the url
+    <c-x>   decrement the last number found in the url
     gU      go up to root of the URL hierarchy
     zH      scroll all the way left
     zL      scroll all the way right
