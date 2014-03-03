@@ -43,9 +43,6 @@ Features:
   final bookmark name.  For example, `/mob` will match bookmarks in the
   `/Mobile Bookmarks` folder.
 
-- Bindings for `goInc` and `goDec` (`C-a` and `C-X`, respectively); these
-  increment and decrement the last number on the current URL.
-
 - The `ENTER` key on an empty vomnibar just cancels (as opposed to opening a new tab).
 
 What follows is the original Vimium README...
