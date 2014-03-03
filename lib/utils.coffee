@@ -1,10 +1,6 @@
 Utils =
   getCurrentVersion: ->
-    # Chromium #15242 will make this XHR request to access the manifest unnecessary
-    manifestRequest = new XMLHttpRequest()
-    manifestRequest.open("GET", chrome.extension.getURL("manifest.json"), false)
-    manifestRequest.send(null)
-    JSON.parse(manifestRequest.responseText).version
+    chrome.runtime.getManifest().version
 
   # Takes a dot-notation object string and call the function
   # that it points to with the correct value for 'this'.
@@ -133,7 +129,10 @@ Utils =
   zip: (arrays) ->
     arrays[0].map (_,i) ->
       arrays.map( (array) -> array[i] )
-    
+
+  # locale-sensitive uppercase detection
+  hasUpperCase: (s) -> s.toLowerCase() != s
+
 # This creates a new function out of an existing function, where the new function takes fewer arguments. This
 # allows us to pass around functions instead of functions + a partial list of arguments.
 Function::curry = ->

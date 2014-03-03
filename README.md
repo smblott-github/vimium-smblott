@@ -1,7 +1,7 @@
 Vimium - The Hacker's Browser
 =============================
 
-![Build Status](https://travis-ci.org/philc/vimium.png)
+[![Build Status](https://secure.travis-ci.org/philc/vimium.png?branch=master)](https://travis-ci.org/philc/vimium)
 
 Vimium is a Chrome extension that provides keyboard-based navigation and control in the spirit of the Vim
 editor.
@@ -11,14 +11,9 @@ __Installation instructions:__
 You can install the stable version of Vimium from the
 [Chrome Extensions Gallery](https://chrome.google.com/extensions/detail/dbepggeogbaibhgnhhndojpepiihcmeb).
 
-Alternatively, you can install it from source:
-
-1. Install [Coffeescript](http://coffeescript.org/#installation) (needed to build vimium).
-2. Run `cake build` in the Vimium directory.
-3. Navigate to `chrome://extensions`
-4. Toggle into Developer Mode
-5. Click on "Load Unpacked Extension..."
-6. Select the Vimium directory.
+Please see
+[CONTRIBUTING.md](https://github.com/philc/vimium/blob/master/CONTRIBUTING.md#installing-from-source)
+for instructions on how you can install Vimium from source.
 
 The Options page can be reached via a link on the help dialog (hit `?`) or via the button next to Vimium on
 the Chrome Extensions page (`chrome://extensions`).
@@ -75,6 +70,7 @@ Manipulating tabs:
     g0         go to the first tab
     g$         go to the last tab
     t          create tab
+    yt         duplicate current tab
     x          close current tab
     X          restore closed tab (i.e. unwind the 'x' command)
     T          search through your open tabs
@@ -88,6 +84,7 @@ Additional advanced browsing commands:
     gu      go up one level in the URL hierarchy
     <c-a>   increment the last number found in the url
     <c-x>   decrement the last number found in the url
+    gU      go up to root of the URL hierarchy
     zH      scroll all the way left
     zL      scroll all the way right
 
@@ -132,41 +129,26 @@ Shifts are automatically detected so, for example, `<c-&>` corresponds to ctrl+s
 
 Contributing
 ------------
-You'd like to fix a bug or implement a feature? Great! Check out the bugs on our issues tracker, or implement
-one of the suggestions there that have been tagged 'todo'. If you have a suggestion of your own, start a
-discussion on the issues tracker or on the [mailing list](http://groups.google.com/group/vimium-dev?hl=en). If
-it mirrors a similar feature in another browser or in Vim itself, let us know! Once you've picked something to
-work on, add a comment to the respective issue so others don't duplicate your effort.
-
-Vimium is written in Coffeescript, which compiles to Javascript. To build Vimium from source:
-
-1. Install [Coffeescript](http://coffeescript.org/#installation).
-2. Run `cake autobuild` from within your vimium directory. Any coffeescript files you change will now be automatically compiled to Javascript.
-
-Our tests use [shoulda.js](https://github.com/philc/shoulda.js) and [PhantomJS](http://phantomjs.org/). To run
-the tests:
-
-1. `git submodule update --init --recursive` -- this pulls in shoulda.js.
-2. [Install PhantomJS.](http://phantomjs.org/download.html)
-3. `cake test` to run the tests.
-
-Bugs and features are not the only way to contribute -- more tests are always welcome. You can find out which
-portions of code need them by looking at our coverage reports. To generate these reports:
-
-1. Download [JSCoverage](http://siliconforks.com/jscoverage/download.html) or `brew install jscoverage`
-2. `npm install temp`
-3. `cake coverage` will generate a coverage report in the form of a JSON file (`jscoverage.json`), which can
-   then be viewed using [jscoverage-report](https://github.com/int3/jscoverage-report).  See
-   jscoverage-report's [README](https://github.com/int3/jscoverage-report#jscoverage-report) for more details.
-
-When you're done with your changes, send us a pull request on Github. Feel free to include a change to the
-CREDITS file with your patch.
-
-A few coding style guidelines: 1) follow the style already present in the file, 2) ensure your lines
-don't exceed 110 characters.
+Please see [CONTRIBUTING.md](https://github.com/philc/vimium/blob/master/CONTRIBUTING.md) for details.
 
 Release Notes
 -------------
+1.44 (11/06/2013)
+
+- Add support for recent versions of Chromium.
+- Bugfixes.
+
+1.43 (05/18/2013)
+
+- Relevancy improvements to the Vomnibar's domain & history search.
+- Added gU, which goes to the root of the current URL.
+- Added yt, which duplicates the current tab.
+- Added W, which moves the current tab to a new window.
+- Added marks for saving and jumping to sections of a page. mX to set a mark and `X to return to it.
+- Added "LinkHints.activateModeToOpenIncognito", currently an advanced, unbound command.
+- Disallowed repeat tab closings, since this causes trouble for many people.
+- Update our Chrome APIs so Vimium works on Chrome 28+.
+- Bugfixes.
 
 1.42 (11/03/2012)
 

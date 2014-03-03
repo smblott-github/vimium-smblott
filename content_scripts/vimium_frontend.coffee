@@ -50,7 +50,7 @@ settings =
   eventListeners: {}
 
   init: ->
-    @port = chrome.extension.connect({ name: "settings" })
+    @port = chrome.runtime.connect({ name: "settings" })
     @port.onMessage.addListener(@receiveMessage)
 
   get: (key) -> @values[key]
@@ -104,7 +104,7 @@ initializePreDomReady = ->
   refreshCompletionKeys()
 
   # Send the key to the key handler in the background page.
-  keyPort = chrome.extension.connect({ name: "keyDown" })
+  keyPort = chrome.runtime.connect({ name: "keyDown" })
 
   requestHandlers =
     hideUpgradeNotification: -> HUD.hideUpgradeNotification()
@@ -119,11 +119,10 @@ initializePreDomReady = ->
     getActiveState: -> { enabled: isEnabledForUrl }
     disableVimium: disableVimium
 
-  chrome.extension.onRequest.addListener (request, sender, sendResponse) ->
+  chrome.runtime.onMessage.addListener (request, sender, sendResponse) ->
     # in the options page, we will receive requests from both content and background scripts. ignore those
     # from the former.
-    if sender.tab?.url
-      return sender.tab?.url.startsWith 'chrome-extension://'
+    return if sender.tab and not sender.tab.url.startsWith 'chrome-extension://'
     return unless isEnabledForUrl or request.name == 'getActiveState'
     sendResponse requestHandlers[request.name](request, sender)
     # Ensure the sendResponse callback is freed.
@@ -161,7 +160,7 @@ disableVimium = ->
 window.addEventListener "focus", ->
   # settings may have changed since the frame last had focus
   settings.load()
-  chrome.extension.sendRequest({ handler: "frameFocused", frameId: frameId })
+  chrome.runtime.sendMessage({ handler: "frameFocused", frameId: frameId })
 
 #
 # Initialization tasks that must wait for the document to be ready.
@@ -172,12 +171,12 @@ initializeOnDomReady = ->
   enterInsertModeIfElementIsFocused() if isEnabledForUrl
 
   # Tell the background page we're in the dom ready state.
-  chrome.extension.connect({ name: "domReady" })
+  chrome.runtime.connect({ name: "domReady" })
 
 # This is a little hacky but sometimes the size wasn't available on domReady?
 registerFrameIfSizeAvailable = (is_top) ->
   if (innerWidth != undefined && innerWidth != 0 && innerHeight != undefined && innerHeight != 0)
-    chrome.extension.sendRequest(
+    chrome.runtime.sendMessage(
       handler: "registerFrame"
       frameId: frameId
       area: innerWidth * innerHeight
@@ -271,20 +270,23 @@ extend window,
       groups[0] = ''
       window.location.href = groups.join('')
 
+  goToRoot: () ->
+    window.location.href = window.location.origin
+
   toggleViewSource: ->
-    chrome.extension.sendRequest { handler: "getCurrentTabUrl" }, (url) ->
+    chrome.runtime.sendMessage { handler: "getCurrentTabUrl" }, (url) ->
       if (url.substr(0, 12) == "view-source:")
         url = url.substr(12, url.length - 12)
       else
         url = "view-source:" + url
-      chrome.extension.sendRequest({ handler: "openUrlInNewTab", url: url, selected: true })
+      chrome.runtime.sendMessage({ handler: "openUrlInNewTab", url: url, selected: true })
 
   copyCurrentUrl: ->
     # TODO(ilya): When the following bug is fixed, revisit this approach of sending back to the background
     # page to copy.
     # http://code.google.com/p/chromium/issues/detail?id=55188
-    chrome.extension.sendRequest { handler: "getCurrentTabUrl" }, (url) ->
-      chrome.extension.sendRequest { handler: "copyToClipboard", data: url }
+    chrome.runtime.sendMessage { handler: "getCurrentTabUrl" }, (url) ->
+      chrome.runtime.sendMessage { handler: "copyToClipboard", data: url }
 
     HUD.showForDuration("Yanked URL", 1000)
 
@@ -389,8 +391,9 @@ onKeydown = (event) ->
 
   # handle special keys, and normal input keys with modifiers being pressed. don't handle shiftKey alone (to
   # avoid / being interpreted as ?
-  if (((event.metaKey || event.ctrlKey || event.altKey) && event.keyCode > 31) ||
-      event.keyIdentifier.slice(0, 2) != "U+")
+  if (((event.metaKey || event.ctrlKey || event.altKey) && event.keyCode > 31) || (
+      # TODO(philc): some events don't have a keyidentifier. How is that possible?
+      event.keyIdentifier && event.keyIdentifier.slice(0, 2) != "U+"))
     keyChar = KeyboardUtils.getKeyChar(event)
     # Again, ignore just modifiers. Maybe this should replace the keyCode>31 condition.
     if (keyChar != "")
@@ -476,7 +479,7 @@ onKeyup = (event) -> return unless handlerStack.bubbleEvent('keyup', event)
 checkIfEnabledForUrl = ->
   url = window.location.toString()
 
-  chrome.extension.sendRequest { handler: "isEnabledForUrl", url: url }, (response) ->
+  chrome.runtime.sendMessage { handler: "isEnabledForUrl", url: url }, (response) ->
     isEnabledForUrl = response.isEnabledForUrl
     if (isEnabledForUrl)
       initializeWhenEnabled response
@@ -491,7 +494,7 @@ refreshCompletionKeys = (response) ->
     if (response.validFirstKeys)
       validFirstKeys = response.validFirstKeys
   else
-    chrome.extension.sendRequest({ handler: "getCompletionKeys" }, refreshCompletionKeys)
+    chrome.runtime.sendMessage({ handler: "getCompletionKeys" }, refreshCompletionKeys)
 
 isValidFirstKey = (keyChar) ->
   validFirstKeys[keyChar] || /[1-9]/.test(keyChar)
@@ -578,7 +581,7 @@ updateFindModeQuery = ->
         return match
 
   # default to 'smartcase' mode, unless noIgnoreCase is explicitly specified
-  findModeQuery.ignoreCase = !hasNoIgnoreCaseFlag && !/[A-Z]/.test(findModeQuery.parsedQuery)
+  findModeQuery.ignoreCase = !hasNoIgnoreCaseFlag && !Utils.hasUpperCase(findModeQuery.parsedQuery)
 
   # if we are dealing with a regex, grep for all matches in the text, and then call window.find() on them
   # sequentially so the browser handles the scrolling / text selection.
@@ -843,12 +846,12 @@ findAndFollowRel = (value) ->
 
 window.goPrevious = ->
   previousPatterns = settings.get("previousPatterns") || ""
-  previousStrings = previousPatterns.split(",").filter((s) -> s.length)
+  previousStrings = previousPatterns.split(",").filter( (s) -> s.trim().length )
   findAndFollowRel("prev") || findAndFollowLink(previousStrings)
 
 window.goNext = ->
   nextPatterns = settings.get("nextPatterns") || ""
-  nextStrings = nextPatterns.split(",").filter((s) -> s.length)
+  nextStrings = nextPatterns.split(",").filter( (s) -> s.trim().length )
   findAndFollowRel("next") || findAndFollowLink(nextStrings)
 
 showFindModeHUDForQuery = ->
@@ -908,7 +911,7 @@ window.showHelpDialog = (html, fid) ->
   VimiumHelpDialog.init()
 
   container.getElementsByClassName("optionsPage")[0].addEventListener("click",
-    -> chrome.extension.sendRequest({ handler: "openOptionsPageInNewTab" })
+    -> chrome.runtime.sendMessage({ handler: "openOptionsPageInNewTab" })
     false)
 
 
@@ -965,7 +968,7 @@ HUD =
 
   onUpdateLinkClicked: (event) ->
     HUD.hideUpgradeNotification()
-    chrome.extension.sendRequest({ handler: "upgradeNotificationClosed" })
+    chrome.runtime.sendMessage({ handler: "upgradeNotificationClosed" })
 
   hideUpgradeNotification: (clickEvent) ->
     Tween.fade(HUD.upgradeNotificationElement(), 0, 150,
@@ -1037,7 +1040,7 @@ initializePreDomReady()
 window.addEventListener("DOMContentLoaded", initializeOnDomReady)
 
 window.onbeforeunload = ->
-  chrome.extension.sendRequest(
+  chrome.runtime.sendMessage(
     handler: "updateScrollPosition"
     scrollX: window.scrollX
     scrollY: window.scrollY)

@@ -12,6 +12,7 @@ OPEN_IN_CURRENT_TAB = {}
 OPEN_IN_NEW_TAB = {}
 OPEN_WITH_QUEUE = {}
 COPY_LINK_URL = {}
+OPEN_INCOGNITO = {}
 
 LinkHints =
   hintMarkerContainingDiv: null
@@ -48,6 +49,7 @@ LinkHints =
   activateModeToOpenInNewTab: -> @activateMode(OPEN_IN_NEW_TAB)
   activateModeToCopyLinkUrl: -> @activateMode(COPY_LINK_URL)
   activateModeWithQueue: -> @activateMode(OPEN_WITH_QUEUE)
+  activateModeToOpenIncognito: -> @activateMode(OPEN_INCOGNITO)
 
   activateMode: (mode = OPEN_IN_CURRENT_TAB) ->
     # we need documentElement to be ready in order to append links
@@ -89,7 +91,14 @@ LinkHints =
     else if @mode is COPY_LINK_URL
       HUD.show("Copy link URL to Clipboard")
       @linkActivator = (link) ->
-        chrome.extension.sendRequest({handler: "copyToClipboard", data: link.href})
+        chrome.runtime.sendMessage({handler: "copyToClipboard", data: link.href})
+    else if @mode is OPEN_INCOGNITO
+      HUD.show("Open link in incognito window")
+
+      @linkActivator = (link) ->
+        chrome.runtime.sendMessage(
+          handler: 'openUrlInIncognito'
+          url: link.href)
     else # OPEN_IN_CURRENT_TAB
       HUD.show("Open link in current tab")
       # When we're opening the link in the current tab, don't navigate to the selected link immediately
@@ -173,7 +182,7 @@ LinkHints =
     # TODO(philc): Ignore keys that have modifiers.
     if (KeyboardUtils.isEscape(event))
       @deactivateMode()
-    else
+    else if (event.keyCode != keyCodes.shiftKey)
       keyResult = @markerMatcher.matchHintsByKey(hintMarkers, event)
       linksMatched = keyResult.linksMatched
       delay = keyResult.delay ? 0
@@ -352,6 +361,8 @@ filterHints =
         showLinkText = true
       else if (element.type != "password")
         linkText = element.value
+        if not linkText and 'placeholder' of element
+          linkText = element.placeholder
       # check if there is an image embedded in the <a> tag
     else if (nodeName == "a" && !element.textContent.trim() &&
         element.firstElementChild &&

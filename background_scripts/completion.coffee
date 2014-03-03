@@ -35,12 +35,12 @@ class Suggestion
          <span class="vimiumReset vomnibarTitle">#{@highlightTerms(Utils.escapeHtml(@title))}</span>
        </div>
        <div class="vimiumReset vomnibarBottomHalf">
-        <span class="vimiumReset vomnibarUrl">#{@shortenUrl(@highlightTerms(@url))}</span>
+        <span class="vimiumReset vomnibarUrl">#{@shortenUrl(@highlightTerms(Utils.escapeHtml(@url)))}</span>
         #{relevancyHtml}
       </div>
       """
 
-  shortenUrl: (url) -> @stripTrailingSlash(url).replace(/^http:\/\//, "")
+  shortenUrl: (url) -> @stripTrailingSlash(url).replace(/^https?:\/\//, "")
 
   stripTrailingSlash: (url) ->
     url = url.substring(url, url.length - 1) if url[url.length - 1] == "/"
@@ -512,7 +512,7 @@ RegexpCache =
     regexpString = prefix + regexpString if prefix
     regexpString = regexpString + suffix if suffix
     # Smartcase: Regexp is case insensitive, unless `string` contains a capital letter (testing `string`, not `regexpString`).
-    @cache[regexpString] ||= new RegExp regexpString, (if /[A-Z]/.test string then "" else "i")
+    @cache[regexpString] ||= new RegExp regexpString, (if Utils.hasUpperCase(string) then "" else "i")
 
 # Provides cached access to Chrome's history. As the user browses to new pages, we add those pages to this
 # history cache.

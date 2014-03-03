@@ -21,6 +21,7 @@ Commands =
       description: description
       isBackgroundCommand: options.background
       passCountToFunction: options.passCountToFunction
+      noRepeat: options.noRepeat
 
   mapKeyToCommand: (key, command) ->
     unless @availableCommands[command]
@@ -31,6 +32,7 @@ Commands =
       command: command
       isBackgroundCommand: @availableCommands[command].isBackgroundCommand
       passCountToFunction: @availableCommands[command].passCountToFunction
+      noRepeat: @availableCommands[command].noRepeat
 
   unmapKey: (key) -> delete @keyToCommandRegistry[key]
 
@@ -88,7 +90,7 @@ Commands =
        "scrollToTop", "scrollToBottom", "scrollToLeft", "scrollToRight", "scrollPageDown",
        "scrollPageUp", "scrollFullPageUp", "scrollFullPageDown",
        "reload", "toggleViewSource", "copyCurrentUrl", "LinkHints.activateModeToCopyLinkUrl",
-       "openCopiedUrlInCurrentTab", "openCopiedUrlInNewTab", "goUp", "goInc", "goDec",
+       "openCopiedUrlInCurrentTab", "openCopiedUrlInNewTab", "goUp", "goInc", "goDec", "goToRoot",
        "enterInsertMode", "focusInput",
        "LinkHints.activateMode", "LinkHints.activateModeToOpenInNewTab", "LinkHints.activateModeWithQueue",
        "Vomnibar.activate", "Vomnibar.activateInNewTab", "Vomnibar.activateTabSelection",
@@ -98,7 +100,7 @@ Commands =
     historyNavigation:
       ["goBack", "goForward"]
     tabManipulation:
-      ["nextTab", "previousTab", "firstTab", "lastTab", "createTab", "removeTab", "restoreTab"]
+      ["nextTab", "previousTab", "firstTab", "lastTab", "createTab", "duplicateTab", "removeTab", "restoreTab", "moveTabToNewWindow"]
     misc:
       ["showHelp"]
 
@@ -107,7 +109,7 @@ Commands =
   # from Vimium will uncover these gems.
   advancedCommands: [
     "scrollToLeft", "scrollToRight",
-    "goUp", "goInc", "goDec", "focusInput", "LinkHints.activateModeWithQueue",
+    "goUp", "goInc", "goDec", "goToRoot", "focusInput", "LinkHints.activateModeWithQueue",
     "goPrevious", "goNext", "Marks.activateCreateMode", "Marks.activateGotoMode"]
 
 defaultKeyMappings =
@@ -135,6 +137,7 @@ defaultKeyMappings =
   "gu": "goUp"
   "<c-a>": "goInc"
   "<c-x>": "goDec"
+  "gU": "goToRoot"
 
   "gi": "focusInput"
 
@@ -162,7 +165,9 @@ defaultKeyMappings =
   "g0": "firstTab"
   "g$": "lastTab"
 
+  "W": "moveTabToNewWindow"
   "t": "createTab"
+  "yt": "duplicateTab"
   "x": "removeTab"
   "X": "restoreTab"
 
@@ -214,6 +219,8 @@ commandDescriptions =
   'LinkHints.activateModeToOpenInNewTab': ["Open a link in a new tab"]
   'LinkHints.activateModeWithQueue': ["Open multiple links in a new tab"]
 
+  "LinkHints.activateModeToOpenIncognito": ["Open a link in incognito window"]
+
   enterFindMode: ["Enter find mode"]
   performFind: ["Cycle forward to the next find match"]
   performBackwardsFind: ["Cycle backward to the previous find match"]
@@ -229,6 +236,7 @@ commandDescriptions =
   goUp: ["Go up the URL hierarchy", { passCountToFunction: true }]
   goInc: ["Increment the last number found in the url", { passCountToFunction: true }]
   goDec: ["Decrement the last number found in the url", { passCountToFunction: true }]
+  goToRoot: ["Go to root of current URL hierarchy", { passCountToFunction: true }]
 
   # Manipulating tabs
   nextTab: ["Go one tab right", { background: true }]
@@ -236,8 +244,10 @@ commandDescriptions =
   firstTab: ["Go to the first tab", { background: true }]
   lastTab: ["Go to the last tab", { background: true }]
   createTab: ["Create new tab", { background: true }]
-  removeTab: ["Close current tab", { background: true }]
+  duplicateTab: ["Duplicate current tab", { background: true }]
+  removeTab: ["Close current tab", { background: true, noRepeat: true }]
   restoreTab: ["Restore closed tab", { background: true }]
+  moveTabToNewWindow: ["Move tab to new window", { background: true }]
 
   "Vomnibar.activate": ["Open URL, bookmark, or history entry"]
   "Vomnibar.activateInNewTab": ["Open URL, bookmark, history entry, in a new tab"]
